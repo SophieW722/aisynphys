@@ -28,6 +28,7 @@ class CellScatterTab(pg.QtGui.QWidget):
 class CellScatterPlot(pg.ScatterPlotWidget):
     def __init__(self):
         pg.ScatterPlotWidget.__init__(self)
+        self.selected_points = []
 
     def set_fields(self, fields):
         self.fields = [('CellClass', {'mode': 'enum'})]
@@ -45,12 +46,41 @@ class CellScatterPlot(pg.ScatterPlotWidget):
             defaults = options.get('defaults')
             if data_type == 'enum':
                 if values is None:
-                    self.fields[field]['values'] = list(set(data.get(field)))
+                    unique_values = list(set(data.get(field)))
+                    self.fields[field]['values'] =  sorted(unique_values, key=lambda x: (x is None, x)) 
                 if defaults is None:
                     n_colors = len(set(data.get(field))) if values is None else len(values)
                     self.fields[field]['defaults'] = {'colormap': [pg.intColor(n, n_colors) for n in np.arange(n_colors)]}
                 
         self.setData(rec_data)
+
+    def plotClicked(self, plot, points):
+        if len(self.selected_points) > 0:
+            for pt, style in self.selected_points:
+                brush, pen, size = style
+                try:
+                    pt.setBrush(brush)
+                    pt.setPen(pen)
+                    pt.setSize(size)
+                except AttributeError:
+                    pass
+        self.selected_points = []
+        for pt in points:
+            style = (pt.brush(), pt.pen(), pt.size())
+            self.selected_points.append([pt, style])
+            data = pt.data()
+            print('Clicked:' '%s' % data.index)
+            # fields = self.fieldList.selectedItems()
+            for field, options in self.fields.items():
+                value = data[field]
+                if value is not None:
+                    if options.get('mode') == 'range':
+                        print('%s: %s' % (field, pg.siFormat(value)))
+                    elif options.get('mode') == 'enum':
+                        print('%s: %s' % (field, value))
+            pt.setBrush(pg.mkBrush('y'))
+            pt.setSize(15)
+        self.sigScatterPlotClicked.emit(self, plot, points)
 
     # def map(self, data):
     #     if self.mapType == 'range':

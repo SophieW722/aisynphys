@@ -1076,6 +1076,9 @@ class CellAnalyzer(pg.QtCore.QObject):
             ('input_resistance', {'mode': 'range'}),
             ('upstroke_downstroke_ratio', {'mode': 'range'}),
             ('fi_slope', {'mode': 'range'}),
+            ('sag', {'mode': 'range'}),
+            ('adaptation_index', {'mode': 'range'}),
+            ('avg_firing_rate', {'mode': 'range'}),
         ]
 
         self.morpho_fields = [
@@ -1108,6 +1111,12 @@ class CellAnalyzer(pg.QtCore.QObject):
             ('last_map', {'mode': 'enum'}),
             ('mapped_subclass', {'mode': 'enum'}),
             ('cluster_label', {'mode': 'enum'}),
+            ('top_leaf', {'mode': 'enum'}),
+        ]
+
+        self.location_fields = [
+            ('fractional_depth', {'mode': 'range'}),
+            ('fractional_layer_depth', {'mode': 'range'}),
         ]
 
 
@@ -1138,7 +1147,10 @@ class CellAnalyzer(pg.QtCore.QObject):
                     cell.intrinsic: self.intrinsic_fields,
                     cell.morphology: self.morpho_fields,
                     cell.patch_seq: self.patchseq_fields,
-                }             
+                } 
+
+                if hasattr(cell, 'cortical_cell_location'):
+                    cell_attributes[cell.cortical_cell_location] = self.location_fields            
 
                 for attribute, fields in cell_attributes.items():
                     cols = [field[0] for field in fields]
