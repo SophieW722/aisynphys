@@ -1133,6 +1133,15 @@ class CellAnalyzer(pg.QtCore.QObject):
         results = OrderedDict()
         for cell_class, class_cells in cell_groups.items(): 
             for cell in class_cells:
+                
+                start = cell.electrode.start_time
+                stop = cell.electrode.stop_time
+
+                if start is not None and stop is not None:
+                    rec_length = (stop - start).total_seconds()/60.
+                else:
+                    rec_length = float('nan')
+
                 results[cell] = {
                     'target_layer': cell.target_layer,
                     'depth': cell.depth,
@@ -1140,6 +1149,7 @@ class CellAnalyzer(pg.QtCore.QObject):
                     'CellClass': cell_class,
                     'cell_class_nonsynaptic': cell.cell_class_nonsynaptic,
                     'time_stamp': cell.experiment.acq_timestamp,
+                    'recording_length': rec_length,
                     # 'rig_operator': cell.experiment.operator_name,
                 }
                 
