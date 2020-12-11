@@ -1060,16 +1060,13 @@ class CellAnalyzer(pg.QtCore.QObject):
                 'colormap': [(255, 0, 0, 255), (0, 0, 255)],
                 }}),
             ('time_stamp', {'mode': 'range'}),
-            # ('rig_operator', {'mode': 'enum'}),
-        ]
-
-        self.cell_fields = [
             ('target_layer', {'mode': 'enum', 'values':['2/3', '4', '5', '6'],
                     'defaults': {'colormap':
                         [(0, 255, 0, 255), (255, 217, 0, 255), (255, 0, 221, 255), (0, 0, 255, 255)]
                     }}),
             ('depth', {'mode': 'range'}),
             ('cre_type', {'mode': 'enum'}),
+            # ('rig_operator', {'mode': 'enum'}),
         ]
 
         self.intrinsic_fields = [
@@ -1174,7 +1171,7 @@ class CellAnalyzer(pg.QtCore.QObject):
         return self.results
 
     def output_fields(self):
-        fields = [self.cell_fields, self.intrinsic_fields, self.morpho_fields, self.patchseq_fields]
+        fields = [self.intrinsic_fields, self.morpho_fields, self.patchseq_fields]
         for field in fields:
             self.fields.extend(field)    
         
