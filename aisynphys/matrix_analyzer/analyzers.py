@@ -1066,6 +1066,7 @@ class CellAnalyzer(pg.QtCore.QObject):
                     }}),
             ('depth', {'mode': 'range'}),
             ('cre_type', {'mode': 'enum'}),
+            ('recording_length', {'mode': 'range'})
             # ('rig_operator', {'mode': 'enum'}),
         ]
 
@@ -1151,27 +1152,26 @@ class CellAnalyzer(pg.QtCore.QObject):
                 }
                 
                 cell_attributes = {
-                    cell.intrinsic: self.intrinsic_fields,
-                    cell.morphology: self.morpho_fields,
-                    cell.patch_seq: self.patchseq_fields,
+                    'intrinsic': self.intrinsic_fields,
+                    'morphology': self.morpho_fields,
+                    'patch_seq': self.patchseq_fields,
+                    'cortical_cell_location': self.location_fields
                 } 
-
-                if hasattr(cell, 'cortical_cell_location'):
-                    cell_attributes[cell.cortical_cell_location] = self.location_fields            
 
                 for attribute, fields in cell_attributes.items():
                     cols = [field[0] for field in fields]
-                    if attribute is not None:  
-                        results[cell].update({col: getattr(attribute, col) for col in cols})
+                    if hasattr(cell, attribute) and getattr(cell, attribute) is not None:  
+                        cell_attr = getattr(cell, attribute)
+                        results[cell].update({col: getattr(cell_attr, col) for col in cols})
                     else:
-                        results[cell].update({col: None for col in cols})
+                        results[cell].update({col: float('nan') for col in cols})
 
         self.results = pd.DataFrame.from_dict(results, orient='index')
         
         return self.results
 
     def output_fields(self):
-        fields = [self.intrinsic_fields, self.morpho_fields, self.patchseq_fields]
+        fields = [self.intrinsic_fields, self.morpho_fields, self.patchseq_fields, self.location_fields]
         for field in fields:
             self.fields.extend(field)    
         

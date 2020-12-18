@@ -1,7 +1,7 @@
 # from pyqtgraph import QtGui, QtCore
-# from pyqtgraph import PlotWidget
-# from pyqtgraph import DataFilterParameter
-# from pyqtgraph import ColorMapParameter
+from pyqtgraph.widgets.PlotWidget import PlotWidget
+from pyqtgraph.widgets.DataFilterWidget import DataFilterParameter
+from pyqtgraph.widgets.ColorMapWidget import ColorMapParameter
 from aisynphys.ui.scatterPlotWidget_styleParameter import StyleMapParameter
 # from pyqtgraph import parametertree as ptree
 # from pyqtgraph import functions as fn
@@ -40,26 +40,26 @@ class ScatterPlotWidget(pg.QtGui.QSplitter):
     sigScatterPlotClicked = pg.QtCore.Signal(object, object, object)
     
     def __init__(self, parent=None):
-        QtGui.QSplitter.__init__(self, pg.QtCore.Qt.Horizontal)
-        self.ctrlPanel = pg.QtGui.QSplitter(QtCore.Qt.Vertical)
+        pg.QtGui.QSplitter.__init__(self, pg.QtCore.Qt.Horizontal)
+        self.ctrlPanel = pg.QtGui.QSplitter(pg.QtCore.Qt.Vertical)
         self.addWidget(self.ctrlPanel)
         self.fieldList = pg.QtGui.QListWidget()
         self.fieldList.setSelectionMode(self.fieldList.ExtendedSelection)
-        self.ptree = pg.ptree.ParameterTree(showHeader=False)
-        self.filter = pg.DataFilterParameter()
-        self.colorMap = pg.ColorMapParameter()
-        self.style = pg.StyleMapParameter()
-        self.params = pg.ptree.Parameter.create(name='params', type='group', children=[self.filter, self.colorMap, self.style])
+        self.ptree = pg.parametertree.ParameterTree(showHeader=False)
+        self.filter = DataFilterParameter()
+        self.colorMap = ColorMapParameter()
+        self.style = StyleMapParameter()
+        self.params = pg.parametertree.Parameter.create(name='params', type='group', children=[self.filter, self.colorMap, self.style])
         self.ptree.setParameters(self.params, showTop=False)
         
-        self.plot = pg.PlotWidget()
+        self.plot = PlotWidget()
         self.ctrlPanel.addWidget(self.fieldList)
         self.ctrlPanel.addWidget(self.ptree)
         self.addWidget(self.plot)
         
-        fg = pg.mkColor(getConfigOption('foreground'))
+        fg = pg.mkColor(pg.getConfigOption('foreground'))
         fg.setAlpha(150)
-        self.filterText = TextItem(border=pg.getConfigOption('foreground'), color=fg)
+        self.filterText = pg.TextItem(border=pg.getConfigOption('foreground'), color=fg)
         self.filterText.setPos(60,20)
         self.filterText.setParentItem(self.plot.plotItem)
         
@@ -69,7 +69,6 @@ class ScatterPlotWidget(pg.QtGui.QSplitter):
         self.scatterPlot = None
         self.selectionScatter = None
         self.selectedIndices = []
-        # self.style = dict(pen=None, symbol='o')
         self._visibleXY = None  # currently plotted points
         self._visibleData = None  # currently plotted records
         self._visibleIndices = None
