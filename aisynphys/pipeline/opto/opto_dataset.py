@@ -89,7 +89,7 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                     sync_rec=srec_entry,
                     electrode=electrode_entry,
                     start_time=rec.start_time,
-                    device_name=str(rec.device_id)
+                    device_name=str(rec.device_id),
                     stim_name=(None if rec.stimulus is None else rec.stimulus.description),
                     stim_meta=(None if rec.stimulus is None else rec.stimulus.save()),
                 )
