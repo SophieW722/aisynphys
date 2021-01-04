@@ -1,22 +1,18 @@
 from aisynphys.pipeline.pipeline_module import DatabasePipelineModule
 from optoanalysis import data_model
-#from multipatch_analysis.database import slice_tables
 import os, glob, re, pickle, time, csv
 from aisynphys import config, lims, constants
-from acq4.util.DataManager import getDirHandle
 from acq4.analysis.dataModels.PatchEPhys import getParent
 from collections import OrderedDict
 from aisynphys.util import datetime_to_timestamp, timestamp_to_datetime
-#import multipatch_analysis.database as db
+from neuroanalysis.util.optional_import import optional_import
+getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 
-
-#from .opto_experiment import OptoExperimentPipelineModule
 
 class OptoSlicePipelineModule(DatabasePipelineModule):
 
     name = 'opto_slice'
     depencencies = []
-    #table_group = slice_tables
     table_group = ['slice']
 
     @classmethod
