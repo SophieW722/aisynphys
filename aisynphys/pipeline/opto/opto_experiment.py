@@ -4,12 +4,14 @@ from aisynphys import config
 from .opto_slice import OptoSlicePipelineModule
 from collections import OrderedDict
 import csv, codecs, glob, os
-from acq4.util.DataManager import getDirHandle
+#from acq4.util.DataManager import getDirHandle
 from neuroanalysis.data.experiment import AI_Experiment
 #from neuroanalysis.data.libraries import opto
 from neuroanalysis.data.loaders.opto_experiment_loader import OptoExperimentLoader
 from optoanalysis import data_model
 from ... import config
+from neuroanalysis.util.optional_import import optional_import
+getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 
 ##### TODO: GO BACK TO EXPERIEMENT BEING DEPENDENT ON SLICE -- IN ALL SLICES USE EXPERIMENTS.CSV TO COME UP WITH SLICE LIST
 
