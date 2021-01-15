@@ -153,6 +153,13 @@ if __name__ == '__main__':
             # {'target_layer': '6', 'cortical_layer': ('6', '6a', '6b'), 'display_names': ('', 'L6')},
         ]),
 
+        ('T-Mapped Subclass', [
+            {'mapped_subclass': 'IT', 'cortical_layer': '2/3', 'display_names': ('L2/3', 'IT')},
+            {'mapped_subclass': 'pvalb', 'display_names': ('', 'Pvalb')},
+            {'mapped_subclass': 'sst', 'display_names': ('', 'Sst')},
+            {'mapped_subclass': 'vip', 'display_names': ('', 'Vip')}
+        ]),
+
         ('Layer 2/3 T-types', [
             {'t_type': 'L2/3 IT VISp Rrad', 'display_names': ('L2/3 IT', 'Rrad')},
             {'t_type': 'L2/3 IT VISp Agmat', 'display_names': ('L2/3 IT', 'Agmat')},
@@ -182,24 +189,27 @@ if __name__ == '__main__':
         ]),
 
         ('PatchSeq', [                                                                
-            {'t_type': 'L2/3 IT VISp Rrad', 'display_names': ('L2/3 IT', 'Rrad')},
-            {'t_type': 'L2/3 IT VISp Agmat', 'display_names': ('L2/3 IT', 'Agmat')},        
+            # {'t_type': 'L2/3 IT VISp Rrad', 'display_names': ('L2/3 IT', 'Rrad')},
+            # {'t_type': 'L2/3 IT VISp Agmat', 'display_names': ('L2/3 IT', 'Agmat')},        
+            {'mapped_subclass': 'pvalb', 'display_names': ('Pvalb', 'subclass')},
             {'t_type': ('Pvalb Tpbg', 'Pvalb Reln Itm2a'), 'display_names': ('Pvalb', 'MET-4\nTpbg, Reln Itm2a')},       
             {'t_type': 'Pvalb Tpbg', 'display_names': ('Pvalb', 'Tpbg')},
             {'t_type': 'Pvalb Reln Itm2a', 'display_names': ('Pvalb', 'Reln Itm2a')},   
-            {'t_type': ('Sst Tac1 Htr1d', 'Sst Tac1 Tacr3'), 'display_names': ('Sst', 'MET-2\nTac1 Htr1d, Tac1 Tacr3')},
-            {'t_type': 'Sst Tac1 Htr1d', 'display_names': ('Sst', 'Tac1 Htr1d')},
-            {'t_type': 'Sst Tac1 Tacr3', 'display_names': ('Sst', 'Tac1 Tacr3')},
+            {'mapped_subclass': 'sst', 'display_names': ('Sst', 'subclass')},
+            # {'t_type': ('Sst Tac1 Htr1d', 'Sst Tac1 Tacr3'), 'display_names': ('Sst', 'MET-2\nTac1 Htr1d, Tac1 Tacr3')},
+            # {'t_type': 'Sst Tac1 Htr1d', 'display_names': ('Sst', 'Tac1 Htr1d')},
+            # {'t_type': 'Sst Tac1 Tacr3', 'display_names': ('Sst', 'Tac1 Tacr3')},
             {'t_type': ('Sst Calb2 Pdlim5', 'Sst Calb2 Necab1'), 'display_names': ('Sst', 'MET-3\nCalb2 Pdlim5, Calb2 Necab1')},
             {'t_type': 'Sst Calb2 Pdlim5', 'display_names': ('Sst', 'Calb2 Pdlim5')},
             {'t_type': 'Sst Calb2 Necab1', 'display_names': ('Sst', 'Calb2 Necab1')},
+            {'mapped_subclass': 'vip', 'display_names': ('Vip', 'subclass')},
             {'t_type': ('Vip Rspo1 Itga4', 'Vip Chat Htr1f', 'Vip Pygm C1ql1', 'Vip Igrbp4 Mab2l1'), 'display_names': ('Vip', 
                 'MET-1\nRspo1 Itga4, Chat Htr1f\nPygm C1ql1, Igfbp4 Mab21l1')},
             {'t_type': 'Vip Pygm C1ql1', 'display_names': ('Vip', 'Pygm C1ql1')},
             {'t_type': ('Vip Ptprt Pkp2', 'Vip Rspo4 Rxfp1 Chat', 'Vip Gpc3 Slc18a3'), 'display_names': ('Vip',
                 'MET-2\nPtprt Pkp2, Rspo4 Rxfp1 Chat\nGpc3 Slc18a3')},
             {'t_type': 'Vip Ptprt Pkp2', 'display_names': ('Vip', 'Ptprt Pkp2')},
-            {'t_type': ('Vip Lmo1 Myl1'), 'display_names': ('Vip','MET-4\nLmo1 Myl1')},
+            # {'t_type': ('Vip Lmo1 Myl1'), 'display_names': ('Vip','MET-4\nLmo1 Myl1')},
             {'t_type': ('Vip Crispld2 Htr2c', 'Vip Crispld2 Kcne4'), 'display_names': ('Vip', 'MET-5\nCrispld2 Htr2c, Crispld2 Kcne4')},
             {'t_type': 'Vip Crispld2 Htr2c', 'display_names': ('Vip', 'Crispld2 Htr2c')},
             {'t_type': 'Vip Crispld2 Kcne4', 'display_names': ('Vip', 'Crispld2 Kcne4')},
