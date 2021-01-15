@@ -1155,9 +1155,10 @@ class CellAnalyzer(pg.QtCore.QObject):
                     'intrinsic': self.intrinsic_fields,
                     'morphology': self.morpho_fields,
                     'patch_seq': self.patchseq_fields,
-                    'cortical_cell_location': self.location_fields
+                    'cortical_location': self.location_fields
                 } 
 
+                
                 for attribute, fields in cell_attributes.items():
                     cols = [field[0] for field in fields]
                     if hasattr(cell, attribute) and getattr(cell, attribute) is not None:  

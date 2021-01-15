@@ -51,11 +51,12 @@ class CellScatterPlot(ScatterPlotWidget):
                     if field =='CellClass':
                         self.fields[field]['values'] =  sorted(unique_values, key=lambda x: (x.name is None, x.name))
                     else: 
+                        unique_values = [v for v in unique_values if isinstance(v, str)]
                         self.fields[field]['values'] =  sorted(unique_values, key=lambda x: (x is None, x)) 
                 if defaults is None:
                     n_colors = len(set(data.get(field))) if values is None else len(values)
                     self.fields[field]['defaults'] = {'colormap': [pg.intColor(n, n_colors) for n in np.arange(n_colors)]}
-                
+              
         self.setData(rec_data)
 
     def plotClicked(self, plot, points):
@@ -100,9 +101,9 @@ class CellScatterPlot(ScatterPlotWidget):
         pre_style = [c for c in cell_class_style.children() if c.name() == pre_class.name][0]
         pre_style.setValue(True)
         pre_style['Symbol'] = 't'
-        post_style.setValue(True)
         post_style = [c for c in cell_class_style.children() if c.name() == post_class.name][0]
-        post_style['Symbol'] = 't1'
+        post_style.setValue(True)
+        post_style['Symbol'] = 't2'
 
     def reset_element_color(self):
         try:
