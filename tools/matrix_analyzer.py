@@ -189,8 +189,8 @@ if __name__ == '__main__':
         ]),
 
         ('PatchSeq', [                                                                
-            # {'t_type': 'L2/3 IT VISp Rrad', 'display_names': ('L2/3 IT', 'Rrad')},
-            # {'t_type': 'L2/3 IT VISp Agmat', 'display_names': ('L2/3 IT', 'Agmat')},        
+            {'t_type': 'L2/3 IT VISp Rrad', 'display_names': ('L2/3 IT', 'Rrad')},
+            {'t_type': 'L2/3 IT VISp Agmat', 'display_names': ('L2/3 IT', 'Agmat')},        
             {'mapped_subclass': 'pvalb', 'display_names': ('Pvalb', 'subclass')},
             {'t_type': ('Pvalb Tpbg', 'Pvalb Reln Itm2a'), 'display_names': ('Pvalb', 'MET-4\nTpbg, Reln Itm2a')},       
             {'t_type': 'Pvalb Tpbg', 'display_names': ('Pvalb', 'Tpbg')},
