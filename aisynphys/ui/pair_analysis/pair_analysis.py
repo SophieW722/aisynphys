@@ -1,4 +1,4 @@
-import sys, copy, argparse, datetime
+import sys, copy, argparse, datetime, cProfile
 from collections import OrderedDict
 from random import shuffle, seed
 import numpy as np
@@ -194,6 +194,8 @@ class PairAnalysisWindow(pg.QtGui.QWidget):
                 self.experiment_browser.populate(experiments=expts)
 
     def selected_pair(self):
+        p = cProfile.Profile()
+        p.enable()
         with pg.BusyCursor():
             self.fit_compare.hide()
             self.meta_compare.hide()
@@ -218,8 +220,10 @@ class PairAnalysisWindow(pg.QtGui.QWidget):
             else:
                 self.pair_analyzer.load_pair(pair, self.default_session, record=record)
                 self.pair_analyzer.analyze_responses()
-                self.pair_analyzer.load_saved_fit(record)
-
+                print('Loading previous fit is turned OFF')
+                # self.pair_analyzer.load_saved_fit(record)
+        p.disable()
+        # p.print_stats(sort='cumulative')
     def explore_fit(self, mode, holding):
         fit = self.pair_analyzer.last_fit[mode, holding]
         self.fit_explorer = FitExplorer(fit)
@@ -340,11 +344,11 @@ class TSeriesPlot(pg.GraphicsLayoutWidget):
         
         self.items = []
 
-    def plot_responses(self, pulse_responses):
-        self.plot_traces(pulse_responses)
+    def plot_responses(self, pulse_responses, avg_color='b', avg_only=False):
+        self.plot_traces(pulse_responses, avg_color=avg_color, avg_only=avg_only)
         self.plot_spikes(pulse_responses)
 
-    def plot_traces(self, pulse_responses):  
+    def plot_traces(self, pulse_responses, avg_color='b', avg_only=False):  
         for i, holding in enumerate(pulse_responses.keys()):
             for qc, prs in pulse_responses[holding].items():
                 if len(prs) == 0:
@@ -360,19 +364,22 @@ class TSeriesPlot(pg.GraphicsLayoutWidget):
                         continue
                 if post_ts is None:
                     continue        
-                for trace in post_ts:
-                    item = self.trace_plots[i].plot(trace.time_values, trace.data, pen=self.qc_color[qc])
-                    if qc == 'qc_fail':
-                        item.setZValue(-10)
-                    self.items.append(item)
+                if avg_only == False:
+                    for trace in post_ts:
+                        item = self.trace_plots[i].plot(trace.time_values, trace.data, pen=self.qc_color[qc])
+                        if qc == 'qc_fail':
+                            item.setZValue(-10)
+                        self.items.append(item)
                 if qc == 'qc_pass':
                     grand_trace = post_ts.mean()
-                    item = self.trace_plots[i].plot(grand_trace.time_values, grand_trace.data, pen={'color': 'b', 'width': 2})
+                    item = self.trace_plots[i].plot(grand_trace.time_values, grand_trace.data, pen={'color': avg_color, 'width': 2.5})
+                    item.setZValue(0)
                     self.items.append(item)
             self.trace_plots[i].autoRange()
             self.trace_plots[i].setXRange(-5e-3, 10e-3)
             # y_range = [grand_trace.data.min(), grand_trace.data.max()]
             # self.plots[i].setYRange(y_range[0], y_range[1], padding=1)
+        print('plotted traces')
 
     def plot_spikes(self, pulse_responses):
         for i, holding in enumerate(pulse_responses.keys()):
@@ -399,6 +406,7 @@ class TSeriesPlot(pg.GraphicsLayoutWidget):
                     if qc == 'qc_fail':
                         item.setZValue(-10)
                     self.items.append(item)
+        print('plotted spikes')
 
     def plot_fit(self, trace, holding, fit_pass=False):
         if holding == -55:
@@ -567,7 +575,12 @@ class PairAnalysis(object):
             q = response_query(default_session, pair)
             self.pulse_responses = [q.PulseResponse for q in q.all()]
             print('got %d pulse responses' % len(self.pulse_responses))
-                
+            ## initial test on loading all responses and any response <= 50Hz
+            self.all_responses = default_session.query(db.PulseResponse).filter(db.PulseResponse.pair_id==pair.id).all()
+            print('all responses: %d' % len(self.all_responses))
+            q2 = default_session.query(db.PulseResponse).join(db.StimPulse)
+            self.responses_50hz_inclusive = q2.filter(db.PulseResponse.pair_id==pair.id).filter(db.StimPulse.previous_pulse_dt >= 0.019).all()
+            print('all responses <= 50Hz: %d' % len(self.responses_50hz_inclusive))
             if pair.has_synapse is True:
                 synapse_type = pair.synapse.synapse_type
             else:
@@ -585,8 +598,24 @@ class PairAnalysis(object):
         if not got_fitable_responses:
             print('No fitable responses, bailing out')
         
-        self.vc_plot.plot_responses({holding: self.sorted_responses['vc', holding] for holding in holdings})
-        self.ic_plot.plot_responses({holding: self.sorted_responses['ic', holding] for holding in holdings})    
+        ## adding other groups of pulse responses
+        all_responses_sorted = sort_responses(self.all_responses)
+        responses_50hz_inclusive_sorted = sort_responses(self.responses_50hz_inclusive)
+
+        response_groups = [
+            (all_responses_sorted, {'avg_color': (138, 73, 226), 'avg_only': True}),
+            (responses_50hz_inclusive_sorted, {'avg_color': (255, 140, 0), 'avg_only': True}),
+            (self.sorted_responses, {'avg_color': (0, 0, 255), 'avg_only': True}),
+        ]
+        for response_group, opts in response_groups:
+            print('analyzing responses')
+            # self.vc_plot.plot_responses({holding: response_group['vc', holding] for holding in holdings}, avg_color=opts['avg_color'], avg_only=opts['avg_only'])
+            # self.ic_plot.plot_responses({holding: response_group['ic', holding] for holding in holdings}, avg_color=opts['avg_color'], avg_only=opts['avg_only']) 
+            self.vc_plot.plot_traces({holding: response_group['vc', holding] for holding in holdings}, avg_color=opts['avg_color'], avg_only=opts['avg_only'])
+            self.ic_plot.plot_traces({holding: response_group['ic', holding] for holding in holdings}, avg_color=opts['avg_color'], avg_only=opts['avg_only'])  
+        
+        self.vc_plot.plot_spikes({holding: all_responses_sorted['vc', holding] for holding in holdings})
+        self.ic_plot.plot_spikes({holding: all_responses_sorted['ic', holding] for holding in holdings})   
       
     def fit_response_update(self):
         latency = self.ctrl_panel.user_params['User Latency']
@@ -771,6 +800,7 @@ class PairAnalysis(object):
         self.meta_compare.show()
 
     def load_saved_fit(self, record):
+        print('loading saved fit')
         data = record.notes        
         pair_params = {'Synapse call': data.get('synapse_type', None), 'Polysynaptic call': data.get('polysynaptic_type', None), 'Gap junction call': data.get('gap_junction', False)}
         self.ctrl_panel.update_user_params(**pair_params)
@@ -853,7 +883,7 @@ if __name__ == '__main__':
     parser.add_argument('post_cell_id', type=str, nargs='?', default=None)
 
     args = parser.parse_args(sys.argv[1:])
-
+    
     if args.dbg:
         pg.dbg()
 
@@ -879,3 +909,4 @@ if __name__ == '__main__':
 
     if sys.flags.interactive == 0:
         app.exec_()
+    
