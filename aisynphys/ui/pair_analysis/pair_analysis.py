@@ -220,8 +220,7 @@ class PairAnalysisWindow(pg.QtGui.QWidget):
             else:
                 self.pair_analyzer.load_pair(pair, self.default_session, record=record)
                 self.pair_analyzer.analyze_responses()
-                print('Loading previous fit is turned OFF')
-                # self.pair_analyzer.load_saved_fit(record)
+                self.pair_analyzer.load_saved_fit(record)
         p.disable()
         # p.print_stats(sort='cumulative')
     def explore_fit(self, mode, holding):
@@ -379,7 +378,6 @@ class TSeriesPlot(pg.GraphicsLayoutWidget):
             self.trace_plots[i].setXRange(-5e-3, 10e-3)
             # y_range = [grand_trace.data.min(), grand_trace.data.max()]
             # self.plots[i].setYRange(y_range[0], y_range[1], padding=1)
-        print('plotted traces')
 
     def plot_spikes(self, pulse_responses):
         for i, holding in enumerate(pulse_responses.keys()):
@@ -406,7 +404,6 @@ class TSeriesPlot(pg.GraphicsLayoutWidget):
                     if qc == 'qc_fail':
                         item.setZValue(-10)
                     self.items.append(item)
-        print('plotted spikes')
 
     def plot_fit(self, trace, holding, fit_pass=False):
         if holding == -55:
@@ -603,12 +600,11 @@ class PairAnalysis(object):
         responses_50hz_inclusive_sorted = sort_responses(self.responses_50hz_inclusive)
 
         response_groups = [
-            (all_responses_sorted, {'avg_color': (138, 73, 226), 'avg_only': True}),
+            (all_responses_sorted, {'avg_color': (138, 73, 226), 'avg_only': False}),
             (responses_50hz_inclusive_sorted, {'avg_color': (255, 140, 0), 'avg_only': True}),
             (self.sorted_responses, {'avg_color': (0, 0, 255), 'avg_only': True}),
         ]
         for response_group, opts in response_groups:
-            print('analyzing responses')
             # self.vc_plot.plot_responses({holding: response_group['vc', holding] for holding in holdings}, avg_color=opts['avg_color'], avg_only=opts['avg_only'])
             # self.ic_plot.plot_responses({holding: response_group['ic', holding] for holding in holdings}, avg_color=opts['avg_color'], avg_only=opts['avg_only']) 
             self.vc_plot.plot_traces({holding: response_group['vc', holding] for holding in holdings}, avg_color=opts['avg_color'], avg_only=opts['avg_only'])
