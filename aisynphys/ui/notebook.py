@@ -210,7 +210,8 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
             
             if not correction_only:
                 cp = min(cp, 1)
-                cp_upper_ci = min(cp_upper_ci, 1)
+                cp_upper_ci = min(1, cp_upper_ci)
+                cp_lower_ci = max(0, cp_lower_ci)
 
             cprob[i,j] = cp
             if ctype == 'chemical':
@@ -219,8 +220,10 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                     cprob_str[i,j] += "\n %.3f" %(cp)
             elif ctype == 'electrical':
                 cprob_str[i,j] = "" if result['n_gaps_probed'] == 0 else "%d/%d" % (found, result['n_gaps_probed'])
+
             
             cprob_alpha[i,j] = 1.0 - 1.0 * max(cp_upper_ci - cp, cp - cp_lower_ci)
+
 
     # map connection probability to RGB colors
     mapper = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
@@ -276,6 +279,7 @@ def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_
         'coupling_coeff_pulse':               ('Coupling Coefficient',              '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],            None,        'viridis',     False,  (0, 1),        "%0.2f"),
         'variability_resting_state':          ('log(Resting state aCV)',       '',    1,    1,     [db.Dynamics.variability_resting_state],          None,        'viridis',     False,  (-1, 1),       "%0.2f"),
         'variability_stp_induced_state_50hz': ('log(STP induced aCV)',         '',    1,    1,     [db.Dynamics.variability_stp_induced_state_50hz], None,        'viridis',     False,  (-1, 1),       "%0.2f"),
+
     } 
     if metrics is None:
         metrics = synapse_metrics
@@ -325,7 +329,7 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
     post_classes = {pair_class[1].name: pair_class[1] for pair_class in pair_classes}
     pair_classes = ['%s→%s' % (pc[0], pc[1]) for pc in pair_classes]
     for i, metric in enumerate(metrics):
-        pairs_has_metric, metric_name, units, scale, _, _, _, _, _ = get_metric_data(metric, db, pre_classes=pre_classes, post_classes=post_classes, pair_query_args=pair_query_args)
+        pairs_has_metric, metric_name, units, scale, alpha, cmap, cmap_log, clim, cell_fmt = get_metric_data(metric, db, pre_classes=pre_classes, post_classes=post_classes, pair_query_args=pair_query_args)
         pairs_has_metric['pair_class'] = pairs_has_metric['pre_class'] + '→' + pairs_has_metric['post_class']
         pairs_has_metric = pairs_has_metric[pairs_has_metric['pair_class'].isin(pair_classes)]
         pairs_has_metric[metric] *= scale
@@ -350,6 +354,8 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         label = '\n'.join(wrap(label, 20))
         ax[i].set_ylabel(label, size=10)
         ax[i].set_yticklabels([], minor=True)
+        if cmap_log:
+            ax[i].set_yscale('log')
         ax[i].spines['right'].set_visible(False)
         ax[i].spines['top'].set_visible(False)
         ax[i].yaxis.set_ticks_position('left')
@@ -409,14 +415,15 @@ def ei_hist_plot(ax, metric, bin_edges, db, pair_query_args):
 
     return ex_pairs, in_pairs
 
-def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, pair_query_args=None, estimator=np.mean):
+def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, pair_query_args=None, estimator=np.mean, clim=None):
     if class_labels is None:
         class_labels = {key: key for key in pre_classes.keys()}
-    pairs_has_metric, metric_name, units, scale, alpha, cmap, cmap_log, clim, cell_fmt = get_metric_data(metric, db, pre_classes, post_classes, pair_query_args=pair_query_args)
+    pairs_has_metric, metric_name, units, scale, alpha, cmap, cmap_log, default_clim, cell_fmt = get_metric_data(metric, db, pre_classes, post_classes, pair_query_args=pair_query_args)
     metric_data = pairs_has_metric.groupby(['pre_class', 'post_class']).aggregate(lambda x: estimator(x))
     error = pairs_has_metric.groupby(['pre_class', 'post_class']).aggregate(lambda x: np.std(x))
     count = pairs_has_metric.groupby(['pre_class', 'post_class']).count()
 
+    clim = clim or default_clim
     cmap = matplotlib.cm.get_cmap(cmap)
     if cmap_log:
         norm = matplotlib.colors.LogNorm(vmin=clim[0], vmax=clim[1], clip=False)
