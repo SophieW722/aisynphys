@@ -291,7 +291,7 @@ def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_
     
     pair_query_args = pair_query_args or {}
 
-    metric_name, units, scale, alpha, columns, map_fn, cmap, cmap_log, clim, cell_fmt = metrics[metric]
+    metric_name, units, scale, alpha, columns, cmap, cmap_log, clim, cell_fmt = metrics[metric]
 
     if pre_classes is None or post_classes is None:
         return None, metric_name, units, scale, alpha, cmap, cmap_log, clim, cell_fmt
