@@ -256,7 +256,6 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
 
 
 def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_args=None, metrics=None):
-    def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_args=None, metrics=None):
     synapse_metrics = {
         #                                     name                                  unit   scale alpha  db columns                                         colormap       log     clim           text format
         'psp_amplitude':                      ('PSP Amplitude',                     'mV',  1e3,  1,     [db.Synapse.psp_amplitude],                        'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
