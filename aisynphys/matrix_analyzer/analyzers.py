@@ -17,7 +17,7 @@ from aisynphys.database import default_db as db
 from neuroanalysis.data import TSeries, TSeriesList
 from neuroanalysis.baseline import float_mode
 from neuroanalysis.filter import bessel_filter
-from aisynphys.connectivity import pair_was_probed, connection_probability_ci
+from aisynphys.connectivity import pair_was_probed, connection_probability_ci, pair_probed_gj
 
 
 thermal_colormap = pg.ColorMap(
@@ -276,11 +276,12 @@ class ConnectivityAnalyzer(Analyzer):
             for pair in class_pairs:
                 no_data = False
                 probed = pair_was_probed(pair, pre_class.output_synapse_type)
-                if probed is False:
+                gj_probed = pair_probed_gj(pair)
+                if probed is False or gj_probed is False:
                     no_data = True
 
                 connected = pair.has_synapse if probed is True else False
-                gap = pair.has_electrical if probed is True else False
+                gap = pair.has_electrical if gj_probed is True else False
                 distance = pair.distance if probed is True else float('nan')
                 
 
@@ -293,7 +294,7 @@ class ConnectivityAnalyzer(Analyzer):
                 'Gap Junction': gap,
                 'Distance': distance,
                 'Connection Probability': [int(connected) if connected is not None else 0, int(probed) if probed is not None else 0],
-                'Gap Junction Probability': [int(gap) if gap is not None else 0, int(probed) if probed is not None else 0],
+                'Gap Junction Probability': [int(gap) if gap is not None else 0, int(gj_probed) if gj_probed is not None else 0],
                 'matrix_completeness': [int(connected) if connected is not None else 0, int(probed) if probed is not None else 0],
                 
                 }
@@ -981,7 +982,8 @@ class DynamicsAnalyzer(Analyzer):
             for pair in no_qc_data:
                 print ("\t\t %s" % (pair))
 
-    def plot_element_data(self, pre_class, post_class, element, field_name, color='g', trace_plt=None):
+    def plot_element_data(self, pre_class, post_class, element, field_name, color='g', trace_plt=None, pair_actions=None):
+        self.pair_actions = pair_actions
         trace_plt = None
         val = element[field_name].mean()
         line = pg.InfiniteLine(val, pen={'color': color, 'width': 2}, movable=False)
@@ -1071,22 +1073,22 @@ class CellAnalyzer(pg.QtCore.QObject):
         ]
 
         self.intrinsic_fields = [
-            ('input_resistance', {'mode': 'range'}),
-            ('upstroke_downstroke_ratio', {'mode': 'range'}),
-            ('fi_slope', {'mode': 'range'}),
-            ('sag', {'mode': 'range'}),
-            ('adaptation_index', {'mode': 'range'}),
+            ('input_resistance_ss', {'mode': 'range'}),
+            ('ap_upstroke_downstroke_ratio', {'mode': 'range'}),
+            ('rheobase', {'mode': 'range'}),
             ('avg_firing_rate', {'mode': 'range'}),
+            ('sag', {'mode': 'range'}),
+            ('tau', {'mode': 'range'}),
+            ('ap_width', {'mode': 'range'}),
+            ('fi_slope', {'mode': 'range'}),
+            ('adaptation_index', {'mode': 'range'}),
+            ('chirp_peak_ratio', {'mode': 'range'}),
+
         ]
 
         self.morpho_fields = [
             ('dendrite_type', {'mode': 'enum', 'values': ['spiny', 'aspiny', 'sparsely spiny', 'NEI']}),
             ('axon_origin', {'mode': 'enum'}),
-            ('cortical_layer', {'mode': 'enum', 'values': ['1', '2', '2/3', '4','5', '6a', '6b'],
-                    'defaults': {'colormap':
-                        [(255, 0, 0, 255), (0, 255, 145, 255), (0, 255, 0, 255), (255, 217, 0, 255), (255, 0, 221, 255), 
-                        (0, 170, 255, 255), (0, 255, 255, 255)]
-                    }}),
             ('apical_trunc_distance', {'mode': 'range'}),
             ('axon_trunc_distance', {'mode': 'range'}),
         ]
@@ -1115,6 +1117,17 @@ class CellAnalyzer(pg.QtCore.QObject):
         self.location_fields = [
             ('fractional_depth', {'mode': 'range'}),
             ('fractional_layer_depth', {'mode': 'range'}),
+        ]
+
+        self.cell_location_fields = [
+            ('cortical_layer', {'mode': 'enum', 'values': ['1', '2', '2/3', '4','5', '6a', '6b'],
+                    'defaults': {'colormap':
+                        [(255, 0, 0, 255), (0, 255, 145, 255), (0, 255, 0, 255), (255, 217, 0, 255), (255, 0, 221, 255), 
+                        (0, 170, 255, 255), (0, 255, 255, 255)]
+                    }}),
+            ('fractional_depth', {'mode': 'range'}),
+            ('distance_to_pia', {'mode': 'range'}),
+            ('distance_to_wm', {'mode': 'range'}),
         ]
 
 
@@ -1152,18 +1165,19 @@ class CellAnalyzer(pg.QtCore.QObject):
                 }
                 
                 cell_attributes = {
-                    'intrinsic': self.intrinsic_fields,
-                    'morphology': self.morpho_fields,
-                    'patch_seq': self.patchseq_fields,
-                    'cortical_location': self.location_fields
-                } 
+                    cell.intrinsic: self.intrinsic_fields,
+                    cell.morphology: self.morpho_fields,
+                    cell.patch_seq: self.patchseq_fields,
+                    cell.cortical_location: self.cell_location_fields,
+                }             
+
 
                 
                 for attribute, fields in cell_attributes.items():
                     cols = [field[0] for field in fields]
-                    if hasattr(cell, attribute) and getattr(cell, attribute) is not None:  
-                        cell_attr = getattr(cell, attribute)
-                        results[cell].update({col: getattr(cell_attr, col) for col in cols})
+
+                    if attribute is not None: 
+                        results[cell].update({col: getattr(attribute, col) for col in cols})
                     else:
                         results[cell].update({col: float('nan') for col in cols})
 
@@ -1172,7 +1186,9 @@ class CellAnalyzer(pg.QtCore.QObject):
         return self.results
 
     def output_fields(self):
-        fields = [self.intrinsic_fields, self.morpho_fields, self.patchseq_fields, self.location_fields]
+
+        fields = [self.cell_fields, self.intrinsic_fields, self.morpho_fields, self.cell_location_fields, self.patchseq_fields]
+
         for field in fields:
             self.fields.extend(field)    
         
