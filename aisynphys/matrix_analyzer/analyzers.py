@@ -1076,7 +1076,7 @@ class CellAnalyzer(pg.QtCore.QObject):
             ('input_resistance_ss', {'mode': 'range'}),
             ('ap_upstroke_downstroke_ratio', {'mode': 'range'}),
             ('rheobase', {'mode': 'range'}),
-            ('avg_firing_rate', {'mode': 'range'}),
+            ('firing_rate_rheo', {'mode': 'range'}),
             ('sag', {'mode': 'range'}),
             ('tau', {'mode': 'range'}),
             ('ap_width', {'mode': 'range'}),
@@ -1114,10 +1114,6 @@ class CellAnalyzer(pg.QtCore.QObject):
             ('top_leaf', {'mode': 'enum'}),
         ]
 
-        self.location_fields = [
-            ('fractional_depth', {'mode': 'range'}),
-            ('fractional_layer_depth', {'mode': 'range'}),
-        ]
 
         self.cell_location_fields = [
             ('cortical_layer', {'mode': 'enum', 'values': ['1', '2', '2/3', '4','5', '6a', '6b'],
@@ -1128,6 +1124,7 @@ class CellAnalyzer(pg.QtCore.QObject):
             ('fractional_depth', {'mode': 'range'}),
             ('distance_to_pia', {'mode': 'range'}),
             ('distance_to_wm', {'mode': 'range'}),
+            ('fractional_layer_depth', {'mode': 'range'}),
         ]
 
 
@@ -1187,7 +1184,7 @@ class CellAnalyzer(pg.QtCore.QObject):
 
     def output_fields(self):
 
-        fields = [self.cell_fields, self.intrinsic_fields, self.morpho_fields, self.cell_location_fields, self.patchseq_fields]
+        fields = [self.intrinsic_fields, self.morpho_fields, self.cell_location_fields, self.patchseq_fields]
 
         for field in fields:
             self.fields.extend(field)    
