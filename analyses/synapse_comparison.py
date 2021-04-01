@@ -19,15 +19,14 @@ import re
 
 from aisynphys.synaptic_dynamics import DynamicsAnalyzer
 from aisynphys.experiment_list import cached_experiments
-from neuroanalysis.baseline import float_mode
-from neuroanalysis.data import TSeries, TSeriesList
+from neuroanalysis.data import TSeriesList
 from neuroanalysis.filter import bessel_filter
 from neuroanalysis.event_detection import exp_deconvolve
 from scipy import stats
 
 from aisynphys.constants import INHIBITORY_CRE_TYPES, EXCITATORY_CRE_TYPES
 from manuscript_figures import get_response, get_amplitude, response_filter, train_amp, write_cache
-from aisynphys.fitting import fit_psp
+from neuroanalysis.fitting import fit_psp
 from manuscript_figures import arg_to_date, load_cache, summary_plot_pulse, get_expts
 
 

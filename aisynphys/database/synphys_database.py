@@ -210,12 +210,12 @@ class SynphysDatabase(Database):
             .outerjoin(post_location, post_location.cell_id==post_cell.id)
             .join(self.Experiment, self.Pair.experiment_id==self.Experiment.id)
             .outerjoin(self.Slice, self.Experiment.slice_id==self.Slice.id) ## don't want to drop all pairs if we don't have slice or connection strength entries
-            .outerjoin(self.SynapsePrediction)
-            .outerjoin(self.Synapse)
-            .outerjoin(self.PolySynapse)
-            .outerjoin(self.Dynamics)
-            .outerjoin(self.GapJunction)
+            .outerjoin(self.Synapse, self.Synapse.pair_id==self.Pair.id)
+            .outerjoin(self.SynapsePrediction, self.SynapsePrediction.pair_id==self.Pair.id)
+            .outerjoin(self.Dynamics, self.Dynamics.pair_id==self.Pair.id)
             .outerjoin(self.RestingStateFit, self.RestingStateFit.synapse_id==self.Synapse.id)
+            # .outerjoin(self.PolySynapse)
+            # .outerjoin(self.GapJunction)
         )
 
         if pre_class is not None:
@@ -292,8 +292,8 @@ class SynphysDatabase(Database):
                 contains_eager(post_cell.patch_seq, alias=post_patch_seq), 
                 contains_eager(pre_cell.intrinsic, alias=pre_intrinsic),
                 contains_eager(post_cell.intrinsic, alias=post_intrinsic),
-                contains_eager(pre_cell.location, alias=pre_location),
-                contains_eager(post_cell.location, alias=post_location),
+                contains_eager(pre_cell.cortical_location, alias=pre_location),
+                contains_eager(post_cell.cortical_location, alias=post_location),
             )
 
         if 'synapse' in preload:
