@@ -245,10 +245,12 @@ class CellClass(object):
         morpho = aliased(db.Morphology)
         intrinsic = aliased(db.Intrinsic)
         location = aliased(db.CorticalCellLocation)
+        patch_seq = aliased(db.PatchSeq)
         query = (query.outerjoin(morpho, morpho.cell_id==cell_table.id)
                  .outerjoin(intrinsic, intrinsic.cell_id==cell_table.id)
-                 .outerjoin(location, location.cell_id==cell_table.id))
-        tables = [cell_table, morpho, intrinsic, location]
+                 .outerjoin(location, location.cell_id==cell_table.id)
+                 .outerjoin(patch_seq, patch_seq.cell_id==cell_table.id))
+        tables = [cell_table, morpho, intrinsic, location, patch_seq]
         for expr in self.exprs:
             found_attr = False
             key = expr.left.name
