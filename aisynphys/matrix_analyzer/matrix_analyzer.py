@@ -475,6 +475,7 @@ class MatrixAnalyzer(object):
                 self.distance_plot.element_distance(element, color)
                 self.element_scatter.color_selected_element(color, pre_class, post_class)
                 self.pair_scatter.color_selected_element(color, pre_class, post_class)
+                self.cell_scatter.color_selected_element(color, pre_class, post_class)
                 # self.pair_scatter.filter_selected_element(pre_class, post_class)
             else:
                 self.display_matrix_element_reset() 
@@ -484,6 +485,7 @@ class MatrixAnalyzer(object):
                 self.distance_plot.element_distance(element, color)
                 self.element_scatter.color_selected_element(color, pre_class, post_class)
                 self.pair_scatter.color_selected_element(color, pre_class, post_class)
+                self.cell_scatter.color_selected_element(color, pre_class, post_class)
                 # self.pair_scatter.filter_selected_element(pre_class, post_class)
 
     def display_matrix_element_reset(self):

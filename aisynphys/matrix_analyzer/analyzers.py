@@ -1062,29 +1062,28 @@ class CellAnalyzer(pg.QtCore.QObject):
                 'colormap': [(255, 0, 0, 255), (0, 0, 255)],
                 }}),
             ('time_stamp', {'mode': 'range'}),
-            # ('rig_operator', {'mode': 'enum'}),
-        ]
-
-        self.cell_fields = [
             ('target_layer', {'mode': 'enum', 'values':['2/3', '4', '5', '6'],
                     'defaults': {'colormap':
                         [(0, 255, 0, 255), (255, 217, 0, 255), (255, 0, 221, 255), (0, 0, 255, 255)]
                     }}),
             ('depth', {'mode': 'range'}),
             ('cre_type', {'mode': 'enum'}),
+            ('recording_length', {'mode': 'range'})
+            # ('rig_operator', {'mode': 'enum'}),
         ]
 
         self.intrinsic_fields = [
-            ('input_resistance', {'mode': 'range'}),
+            ('input_resistance_ss', {'mode': 'range'}),
             ('ap_upstroke_downstroke_ratio', {'mode': 'range'}),
             ('rheobase', {'mode': 'range'}),
-            ('fi_slope', {'mode': 'range'}),
+            ('firing_rate_rheo', {'mode': 'range'}),
             ('sag', {'mode': 'range'}),
             ('tau', {'mode': 'range'}),
             ('ap_width', {'mode': 'range'}),
             ('fi_slope', {'mode': 'range'}),
             ('adaptation_index', {'mode': 'range'}),
             ('chirp_peak_ratio', {'mode': 'range'}),
+
         ]
 
         self.morpho_fields = [
@@ -1112,7 +1111,9 @@ class CellAnalyzer(pg.QtCore.QObject):
             ('last_map', {'mode': 'enum'}),
             ('mapped_subclass', {'mode': 'enum'}),
             ('cluster_label', {'mode': 'enum'}),
+            ('top_leaf', {'mode': 'enum'}),
         ]
+
 
         self.cell_location_fields = [
             ('cortical_layer', {'mode': 'enum', 'values': ['1', '2', '2/3', '4','5', '6a', '6b'],
@@ -1123,6 +1124,7 @@ class CellAnalyzer(pg.QtCore.QObject):
             ('fractional_depth', {'mode': 'range'}),
             ('distance_to_pia', {'mode': 'range'}),
             ('distance_to_wm', {'mode': 'range'}),
+            ('fractional_layer_depth', {'mode': 'range'}),
         ]
 
 
@@ -1139,6 +1141,15 @@ class CellAnalyzer(pg.QtCore.QObject):
         results = OrderedDict()
         for cell_class, class_cells in cell_groups.items(): 
             for cell in class_cells:
+                
+                start = cell.electrode.start_time
+                stop = cell.electrode.stop_time
+
+                if start is not None and stop is not None:
+                    rec_length = (stop - start).total_seconds()/60.
+                else:
+                    rec_length = float('nan')
+
                 results[cell] = {
                     'target_layer': cell.target_layer,
                     'depth': cell.depth,
@@ -1146,6 +1157,7 @@ class CellAnalyzer(pg.QtCore.QObject):
                     'CellClass': cell_class,
                     'cell_class_nonsynaptic': cell.cell_class_nonsynaptic,
                     'time_stamp': cell.experiment.acq_timestamp,
+                    'recording_length': rec_length,
                     # 'rig_operator': cell.experiment.operator_name,
                 }
                 
@@ -1156,19 +1168,24 @@ class CellAnalyzer(pg.QtCore.QObject):
                     cell.cortical_location: self.cell_location_fields,
                 }             
 
+
+                
                 for attribute, fields in cell_attributes.items():
                     cols = [field[0] for field in fields]
+
                     if attribute is not None: 
                         results[cell].update({col: getattr(attribute, col) for col in cols})
                     else:
-                        results[cell].update({col: None for col in cols})
+                        results[cell].update({col: float('nan') for col in cols})
 
         self.results = pd.DataFrame.from_dict(results, orient='index')
         
         return self.results
 
     def output_fields(self):
-        fields = [self.cell_fields, self.intrinsic_fields, self.morpho_fields, self.cell_location_fields, self.patchseq_fields]
+
+        fields = [self.intrinsic_fields, self.morpho_fields, self.cell_location_fields, self.patchseq_fields]
+
         for field in fields:
             self.fields.extend(field)    
         
