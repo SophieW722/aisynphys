@@ -1,11 +1,9 @@
 import os.path, re, datetime
-import numpy as np
-import pyqtgraph as pg
-import pyqtgraph.configfile
 
-from .. import lims, config
+from .. import lims
 from ..constants import ALL_CRE_TYPES, ALL_LABELS, FLUOROPHORES, LAYERS, INJECTIONS
 from ..genotypes import Genotype
+from . import configfile
 
 
 class Slice(object):
@@ -31,7 +29,7 @@ class Slice(object):
             index = os.path.join(self.path, '.index')
             if not os.path.isfile(index):
                 return None
-            self._slice_info = pg.configfile.readConfigFile(index)['.']
+            self._slice_info = configfile.readConfigFile(index)['.']
         return self._slice_info
     
     @property

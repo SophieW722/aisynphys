@@ -1,11 +1,9 @@
 # coding: utf8
 from __future__ import print_function, division
 
-import os, logging
+import logging
 import numpy as np
-import pyqtgraph as pg
 from collections import OrderedDict
-from ... import config
 from .pipeline_module import MultipatchPipelineModule
 from .dataset import DatasetPipelineModule
 from .morphology import MorphologyPipelineModule

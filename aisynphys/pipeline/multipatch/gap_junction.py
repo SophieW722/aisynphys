@@ -1,11 +1,9 @@
 # coding: utf8
 from __future__ import print_function, division
 
-import os, warnings
-import pyqtgraph as pg
+import warnings
 import numpy as np
 import scipy.stats as stats
-from ... import config
 from .pipeline_module import MultipatchPipelineModule
 from .experiment import ExperimentPipelineModule
 from .dataset import DatasetPipelineModule

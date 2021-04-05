@@ -1,7 +1,6 @@
 # coding: utf8
 import numpy as np
 from pyqtgraph.debug import Profiler
-import pyqtgraph as pg
 from neuroanalysis.fitting import fit_psp
 import aisynphys.data.data_notes_db as notes_db
 from aisynphys.database import default_db as db
@@ -49,27 +48,28 @@ def get_pair_avg_fits(pair, session, notes_session=None, ui=None, max_ind_freq=5
         }, ...}
     
     """
-    prof = pg.debug.Profiler(disabled=True, delayed=False)
-    prof(str(pair))
+    # import pyqtgraph as pg
+    # prof = pg.debug.Profiler(disabled=True, delayed=False)
+    # prof(str(pair))
     results = {}
     
     # query and sort pulse responses with induction frequency 50Hz or slower
     records = response_query(session=session, pair=pair, max_ind_freq=max_ind_freq).all()
-    prof('query prs')
+    # prof('query prs')
     pulse_responses = [rec[0] for rec in records]
 
     # sort into clamp mode / holding bins
     sorted_responses = sort_responses(pulse_responses)
-    prof('sort prs')
+    # prof('sort prs')
 
     # load expected PSP curve fit parameters from notes DB
     notes_rec = notes_db.get_pair_notes_record(pair.experiment.ext_id, pair.pre_cell.ext_id, pair.post_cell.ext_id, session=notes_session)
-    prof('get pair notes')
+    # prof('get pair notes')
 
     if ui is not None:
         ui.show_pulse_responses(sorted_responses)
         ui.show_data_notes(notes_rec)
-        prof('update ui')
+        # prof('update ui')
 
     for (clamp_mode, holding), responses in sorted_responses.items():
         if len(responses['qc_pass']) == 0:
@@ -97,9 +97,9 @@ def get_pair_avg_fits(pair, session, notes_session=None, ui=None, max_ind_freq=5
             elif notes['synapse_type'] == 'in' and holding == -55:
                 sign = 1 if clamp_mode == 'vc' else -1
 
-        prof('prepare %s %s' % (clamp_mode, holding))
+        # prof('prepare %s %s' % (clamp_mode, holding))
         fit_result, avg_response = fit_avg_pulse_response(responses['qc_pass'], latency_window, sign)
-        prof('fit avg')
+        # prof('fit avg')
 
         # measure baseline noise
         avg_baseline_noise = avg_response.time_slice(avg_response.t0, avg_response.t0+7e-3).data.std()

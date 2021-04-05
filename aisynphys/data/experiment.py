@@ -12,8 +12,6 @@ import pickle
 from collections import OrderedDict
 
 import yaml
-import pyqtgraph as pg
-import pyqtgraph.configfile
 
 from .. import lims, yaml_local, config
 from ..constants import ALL_CRE_TYPES, ALL_LABELS, FLUOROPHORES, LAYERS, INJECTIONS
@@ -26,6 +24,7 @@ from .electrode import Electrode
 from .data import MultiPatchDataset
 from .pipette_metadata import PipetteMetadata
 from . import data_notes_db
+from . import configfile
 
 
 class Experiment(object):
@@ -891,7 +890,7 @@ class Experiment(object):
             index = os.path.join(self.path, '.index')
             if not os.path.isfile(index):
                 return None
-            self._site_info = pg.configfile.readConfigFile(index)['.']
+            self._site_info = configfile.readConfigFile(index)['.']
         return self._site_info
 
     @property
@@ -1141,6 +1140,7 @@ class Experiment(object):
 
     def show(self):
         if self._view is None:
+            import pyqtgraph as pg
             pg.mkQApp()
             self._view_widget = pg.GraphicsLayoutWidget()
             self._view = self._view_widget.addViewBox(0, 0)
