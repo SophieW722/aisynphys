@@ -1,6 +1,5 @@
 # coding: utf8
 import numpy as np
-from pyqtgraph.debug import Profiler
 from neuroanalysis.fitting import fit_psp
 import aisynphys.data.data_notes_db as notes_db
 from aisynphys.database import default_db as db
