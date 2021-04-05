@@ -1,15 +1,10 @@
-from __future__ import division, print_function
-import os, sys, glob, re, time
-import numpy as np
-from datetime import datetime
+import os, sys, glob, re
 from collections import OrderedDict
 from .pipeline_module import MultipatchPipelineModule
 from ... import config, lims
-from ...util import datetime_to_timestamp, dir_timestamp
+from ...util import dir_timestamp
 from ...data import Experiment
 from .slice import SlicePipelineModule
-from neuroanalysis.util.optional_import import optional_import
-getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 
 
 class ExperimentPipelineModule(MultipatchPipelineModule):
