@@ -16,7 +16,8 @@ backup_paths:
 """
 from __future__ import print_function
 import os, sys, argparse, logging
-from aisynphys import util
+from aisynphys.util.file_sync import sync_dir
+from aisynphys.util.logging import stderr_log_handler
 from aisynphys import config
 
 
@@ -28,7 +29,7 @@ parser.add_argument('--verbose', action='store_true', default=False, help="Verbo
 args = parser.parse_args(sys.argv[1:])
 
 if args.verbose:
-    util.stderr_log_handler.setLevel(logging.DEBUG)
+    stderr_log_handler.setLevel(logging.DEBUG)
 
 if args.jobs == '*':
     jobs = config.backup_paths.keys()
@@ -40,4 +41,4 @@ for job in jobs:
     source_path = spec['source']
     dest_path = spec['dest']
     log_file = os.path.join(dest_path, 'backup.log')
-    util.sync_dir(source_path, dest_path, test=args.test, log_file=log_file)
+    sync_dir(source_path, dest_path, test=args.test, log_file=log_file)
