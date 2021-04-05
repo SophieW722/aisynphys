@@ -44,9 +44,13 @@ if __name__ == '__main__':
         raise Exception("Could not find pipeline named %s. Options are: %s"%(args.pipeline, str(all_pipelines.keys())))
 
     all_modules = pipeline.sorted_modules()
+    enabled_modules = all_modules.copy()
+    for module in config.get('pipeline', {}).get('disable_modules', []):
+        print(f"Module '{module}' disabled in config")
+        del enabled_modules[module]
     
     if 'all' in args.modules:
-        modules = list(all_modules.values())
+        modules = list(enabled_modules.values())
     else:
         modules = []
         for mod in args.modules:
