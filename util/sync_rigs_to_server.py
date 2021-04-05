@@ -20,7 +20,7 @@ import os, sys, shutil, glob, traceback, pickle, time, re
 from acq4.util.DataManager import getDirHandle
 
 from aisynphys import config
-from aisynphys.util import sync_file
+from aisynphys.util.file_sync import sync_file
 
 
 def sync_experiment(site_dir):
