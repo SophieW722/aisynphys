@@ -19,6 +19,7 @@ class OptoSlicePipelineModule(DatabasePipelineModule):
     def create_db_entries(cls, job, session):
         job_id = job['job_id']
         db = job['database']
+        errors = []
 
         slices = all_slices()
         path = slices[job_id]
@@ -48,6 +49,9 @@ class OptoSlicePipelineModule(DatabasePipelineModule):
                 vals = list(set([d[key] for d in data]))
                 if len(vals) == 1:
                     limsdata[key] = vals[0]
+
+        if len(limsdata) == 0:
+            errors.append("Could not find limsdata for slice %s" % path)
 
         quality = info.get('slice quality', None)
         try:
@@ -103,6 +107,7 @@ class OptoSlicePipelineModule(DatabasePipelineModule):
         sl = db.Slice(**fields)
         session.add(sl)
         session.commit()
+        return errors
 
     def job_records(self, job_ids, session):
         """Return a list of records associated with a list of job IDs.

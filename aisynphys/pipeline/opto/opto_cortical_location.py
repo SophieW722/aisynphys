@@ -14,7 +14,7 @@ from aisynphys import config
 class OptoCortexLocationPipelineModule(DatabasePipelineModule):
     """Imports cell morphology data for each experiment
     """
-    name = 'cortical_location'
+    name = 'opto_cortical_location'
     dependencies = [OptoExperimentPipelineModule]
     table_group = ['cortical_cell_location', 'cortical_site']
     
@@ -22,6 +22,7 @@ class OptoCortexLocationPipelineModule(DatabasePipelineModule):
     def create_db_entries(cls, job, session):
         db = job['database']
         job_id = job['job_id'] ## an expt id
+        errors = []
 
         expt = load_experiment(job_id)
 
@@ -54,17 +55,15 @@ class OptoCortexLocationPipelineModule(DatabasePipelineModule):
                                     cortex['pia_to_wm_distance'] = ((p2[0]-p1[0])**2 + (p2[1]-p1[1])**2)**0.5
                                 cortex['layerBounds_percentDepth'] = item.get('roiState', {}).get('layerBounds_percentDepth')
                                 break
-
+            if len(cortex) == 0:
+                errors.append('No cortex marker found in connections file or mosaic file.')
 
             site_entry = db.CorticalSite(
                     pia_to_wm_distance=cortex.get('pia_to_wm_distance'),
                     pia_position=cortex.get('piaPos'),
                     wm_position=cortex.get('wmPos'),
                     layer_boundaries=cortex.get('layerBounds_percentDepth'),
-                    # layer1_23_boundary=cortex.get('layerBounds_percentDepth',{}).get('L2/3', [None])[0],
-                    # layer23_4_boundary=cortex.get('layerBounds_percentDepth',{}).get('L4', [None])[0],
-                    # layer4_5_boundary=cortex.get('layerBounds_percentDepth',{}).get('L5', [None])[0],
-                    # layer5_6_boundary=cortex.get('layerBounds_percentDepth',{}).get('L6', [None])[0]
+                    #brain_region=None,     # The name of the brain region for the site.
                     )
 
             site_entry.slice = slice_entry
@@ -73,21 +72,41 @@ class OptoCortexLocationPipelineModule(DatabasePipelineModule):
 
 
             for cell_id, cell in expt.cells.items():
-
+                layer_depth = None
+                fractional_layer_depth = None
+                if cortex.get('layerBounds_percentDepth') is not None:
+                    frac_layer_bounds = cortex['layerBounds_percentDepth'].get('L'+cell.target_layer)
+                    if frac_layer_bounds is None:
+                        errors.append("Could not match cell layer to layer bounds for %s. target_layer:%s, layers:%s" %(cell, cell.target_layer, list(cortex['layerBounds_percentDepth'].keys())))
+                        #raise Exception('Could not find layer bounds for layer:"%s" (cell: %s). options are:%s' %('L'+cell.target_layer, cell, cortex.get('layers')))
+                    else:
+                        layer_depth = (cell.percent_depth-frac_layer_bounds[0])*cortex['pia_to_wm_distance'] 
+                        fracional_layer_depth = (cell.percent_depth-frac_layer_bounds[0])/(frac_layer_bounds[1]-frac_layer_bounds[0]) 
                 loc_entry = db.CorticalCellLocation(
                     #cell_id=cell.cell_id,
                     layer=cell.target_layer,
                     distance_to_pia=cell.distance_to_pia,
                     distance_to_wm=cell.distance_to_wm,
-                    fractional_depth=cell.percent_depth
+                    fractional_depth=cell.percent_depth,
+                    layer_depth=layer_depth,                            # Absolute depth within the layer in m.
+                    fractional_layer_depth=fractional_layer_depth,      # Fractional depth within the cells layer.
+                    #position=None,                                      # 2D array, position of cell in slice image coordinates (in m) -- i think this is for having lims images
                 )
-                cell_entry = session.query(db.Cell).filter(db.Cell.experiment_id==db.Experiment.id).filter(db.Experiment.ext_id==job_id).filter(db.Cell.ext_id==cell_id).all()
+
+                q = session.query(db.Cell)
+                q = q.filter(db.Cell.experiment_id==db.Experiment.id)
+                q = q.filter(db.Experiment.ext_id==job_id)
+                q = q.filter(db.Cell.ext_id==cell_id)
+                cell_entry = q.all()
+
                 if len(cell_entry) == 1:
                     loc_entry.cell = cell_entry[0]
                 else:
-                    raise Exception("Found wrong number of cell entries for experiment %s, cell %s" %(job_id, cell_id))
+                    raise Exception("Found %i cell entries for experiment %s, cell %s" %(len(cell_entry),job_id, cell_id))
                 loc_entry.cortical_site = site_entry
                 session.add(loc_entry)
+
+            return errors
 
         except:
             session.rollback()
