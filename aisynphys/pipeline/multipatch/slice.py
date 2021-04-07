@@ -4,7 +4,7 @@ from .pipeline_module import MultipatchPipelineModule
 from ... import config
 from ...util import timestamp_to_datetime
 from ...data.slice import Slice
-from ...data.acq4_data_manager import getDirHandle
+from acq4.util.DataManager import getDirHandle
 
 
 class SlicePipelineModule(MultipatchPipelineModule):

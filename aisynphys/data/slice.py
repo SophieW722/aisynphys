@@ -3,7 +3,7 @@ import os.path, re, datetime
 from .. import lims
 from ..constants import ALL_CRE_TYPES, ALL_LABELS, FLUOROPHORES, LAYERS, INJECTIONS
 from ..genotypes import Genotype
-from . import configfile
+import pyqtgraph.configfile as configfile
 
 
 class Slice(object):
@@ -46,7 +46,7 @@ class Slice(object):
             index = os.path.join(self.parent_path, '.index')
             if not os.path.isfile(index):
                 raise TypeError("Cannot find index file (%s) for experiment %s" % (index, self))
-            self._parent_info = pg.configfile.readConfigFile(index)['.']
+            self._parent_info = configfile.readConfigFile(index)['.']
         return self._parent_info
 
     @property

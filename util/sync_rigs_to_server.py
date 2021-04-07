@@ -19,7 +19,7 @@ rsync itself, but in practice this presents a few difficult issues:
 import os, sys, shutil, glob, traceback, pickle, time, re
 from aisynphys import config
 from aisynphys.util.file_sync import sync_file
-from aisynphys.data.acq4_data_manager import getDirHandle
+from acq4.util.DataManager import getDirHandle
 
 
 def sync_experiment(site_dir):

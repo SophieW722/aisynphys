@@ -13,9 +13,8 @@ from collections import OrderedDict
 
 import yaml
 
-from .. import lims, yaml_local, config
+from .. import lims, config
 from ..constants import ALL_CRE_TYPES, ALL_LABELS, FLUOROPHORES, LAYERS, INJECTIONS
-from ..genotypes import Genotype
 from ..util import timestamp_to_datetime
 from .slice import Slice
 from .cell import Cell
@@ -23,8 +22,7 @@ from .pair import Pair
 from .electrode import Electrode
 from .data import MultiPatchDataset
 from .pipette_metadata import PipetteMetadata
-from . import data_notes_db
-from . import configfile
+import pyqtgraph.configfile as configfile
 
 
 class Experiment(object):
@@ -169,14 +167,6 @@ class Experiment(object):
                     electrical = None if gap_calls is None else ((i, j) in gap_calls)
                     synapse_type = None
 
-                    # If this pair has a record in the data notes DB, then it overrides
-                    # anything found in pipettes.yml
-                    # pair_notes_rec = data_notes_db.get_pair_notes_record(self.uid, pre_cell.cell_id, post_cell.cell_id)
-                    # if pair_notes_rec is not None:
-                    #     electrical = pair_notes_rec.notes['gap_junction']
-                    #     synapse_type = pair_notes_rec.notes['synapse_type']
-                    #     synapse = synapse_type in ('ex', 'in')
-                    
                     pair = Pair(
                         experiment=self,
                         pre_cell=pre_cell,

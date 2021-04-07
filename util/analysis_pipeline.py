@@ -44,8 +44,9 @@ if __name__ == '__main__':
         raise Exception("Could not find pipeline named %s. Options are: %s"%(args.pipeline, str(all_pipelines.keys())))
 
     all_modules = pipeline.sorted_modules()
+    
     enabled_modules = all_modules.copy()
-    for module in config.get('pipeline', {}).get('disable_modules', []):
+    for module in config.pipeline.get('disable_modules', []):
         print(f"Module '{module}' disabled in config")
         del enabled_modules[module]
     
@@ -56,13 +57,13 @@ if __name__ == '__main__':
         for mod in args.modules:
             try:
                 if mod.startswith(':'):
-                    i = list(all_modules.keys()).index(mod[1:])
-                    modules.extend(list(all_modules.values())[:i+1])
+                    i = list(enabled_modules.keys()).index(mod[1:])
+                    modules.extend(list(enabled_modules.values())[:i+1])
                 elif mod.endswith(':'):
-                    i = list(all_modules.keys()).index(mod[:-1])
-                    modules.extend(list(all_modules.values())[i:])
+                    i = list(enabled_modules.keys()).index(mod[:-1])
+                    modules.extend(list(enabled_modules.values())[i:])
                 else:
-                    modules.append(all_modules[mod])
+                    modules.append(enabled_modules[mod])
             except (KeyError, ValueError):
                 print('Unknown analysis module "%s"; options are: %s' % (mod, list(all_modules.keys())))
                 sys.exit(-1)
