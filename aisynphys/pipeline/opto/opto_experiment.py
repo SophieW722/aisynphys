@@ -34,18 +34,18 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
             slice_entry = db.slice_from_timestamp(ts, session=session)
 
             fields = {
-                'storage_path': None if expt.path is None else os.path.relpath(expt.path, config.synphys_data), 
-                'ephys_file': None if expt.loader.get_ephys_file() is None else os.path.relpath(expt.loader.get_ephys_file(), expt.path),
-                'rig_name': expt.rig_name,
+                'ext_id': expt.ext_id,
                 'project_name': expt.project_name,
-                'acq_timestamp': expt.info.get('site_info',{}).get('__timestamp__') ,
+                'date': expt.datetime,
                 'target_region': expt.target_region,
                 'internal': expt.expt_info.get('internal'),
                 'acsf': expt.expt_info.get('solution'),
                 'target_temperature': expt.target_temperature,
-                'ext_id': expt.ext_id,
-                'date': expt.datetime,
+                'rig_name': expt.rig_name,
                 'operator_name': expt.rig_operator,
+                'storage_path': None if expt.path is None else os.path.relpath(expt.path, config.synphys_data), 
+                'ephys_file': None if expt.loader.get_ephys_file() is None else os.path.relpath(expt.loader.get_ephys_file(), expt.path),
+                'acq_timestamp': expt.info.get('site_info',{}).get('__timestamp__')     
             }
 
             expt_entry = db.Experiment(**fields)
@@ -56,22 +56,23 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
             for name, cell in expt.cells.items():
                 if cell.electrode is not None:
                     elec = cell.electrode
-                    elec_entry = db.Electrode(experiment=expt_entry, ext_id=elec.electrode_id, device_id=elec.device_id)
-                    for k in ['patch_status', 'start_time', 'stop_time',  
-                        'initial_resistance', 'initial_current', 'pipette_offset',
-                        'final_resistance', 'final_current']:
-                        if hasattr(elec, k):
-                            setattr(elec_entry, k, getattr(elec, k))
+                    elec_entry = db.Electrode(
+                        experiment=expt_entry, 
+                        ext_id=elec.electrode_id, 
+                        patch_status=elec.patch_status,
+                        start_time=elec.start_time,
+                        stop_time=elec.stop_time,
+                        device_id=elec.device_id)
                     session.add(elec_entry)
 
                 cell_entry = db.Cell(
                     experiment=expt_entry,
-                    electrode=elec_entry if cell.electrode is not None else None,
                     ext_id=cell.cell_id,
+                    electrode=elec_entry if cell.electrode is not None else None,
                     cre_type=cell.cre_type,
                     target_layer=cell.target_layer,
-                    depth=cell.depth,
                     position=cell.position,
+                    depth=cell.depth,
                     cell_class=None, ## fill in cell class fields later in Morphology module (that doesn't currently exist for opto)
                     cell_class_nonsynaptic=None,
                     meta=cell.info
@@ -79,27 +80,29 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
                 session.add(cell_entry)
                 cell_entries[cell] = cell_entry
 
+            pair_entries = {}
             for name, pair in expt.pairs.items():
-                if pair._connection_call == 'excitatory':
-                    sign = +1
-                elif pair._connection_call == 'inhibitory':
-                    sign = -1
-                else:
-                    sign = 0
                 pair_entry = db.Pair(
                     experiment=expt_entry,
                     pre_cell=cell_entries[pair.preCell],
                     post_cell=cell_entries[pair.postCell],
                     has_synapse=pair.isSynapse(),
+                    # has_polysynapse,
                     has_electrical=None,
-                    n_ex_test_spikes=0,  # will be counted in opto_dataset_pipeline_module
-                    n_in_test_spikes=0,
+                    # crosstalk_artifact,
+                    n_ex_test_spikes=0,  # will be counted in opto_dataset pipeline module
+                    n_in_test_spikes=0,  # will be counted in opto_dataset pipeline module
                     distance=pair.distance,
-                    #synapse_sign = sign
+                    # lateral_distance,  # should these be filled in in the opto_cortical_location pipeline module?
+                    # vertical_distance, 
+                    # reciprocal_id, # fill this in below
                 )
+                pair_entries[name] = pair_entry
                 session.add(pair_entry)
 
-            #session.commit()
+            ## fill in reciprocal ids
+            for name, pair in expt.pairs.items():
+                pair_entries[name].reciprocal = pair_entries.get((name[1],name[0]))
 
         except:
             session.rollback()
