@@ -1,26 +1,21 @@
 from aisynphys.pipeline.pipeline_module import DatabasePipelineModule
-#import multipatch_analysis.database as db
 from aisynphys import config
 from .opto_slice import OptoSlicePipelineModule
 from collections import OrderedDict
 import csv, codecs, glob, os
-#from acq4.util.DataManager import getDirHandle
 from neuroanalysis.data.experiment import AI_Experiment
-#from neuroanalysis.data.libraries import opto
 from neuroanalysis.data.loaders.opto_experiment_loader import OptoExperimentLoader
 from optoanalysis import data_model
 from ... import config
 from neuroanalysis.util.optional_import import optional_import
 getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 
-##### TODO: GO BACK TO EXPERIEMENT BEING DEPENDENT ON SLICE -- IN ALL SLICES USE EXPERIMENTS.CSV TO COME UP WITH SLICE LIST
 
 class OptoExperimentPipelineModule(DatabasePipelineModule):
     """Imports per-experiment metadata into DB.
     """
     name = 'opto_experiment'
     dependencies = [OptoSlicePipelineModule]
-    #table_group = db.experiment_tables
     table_group = ['experiment', 'electrode', 'cell', 'pair']
 
     @classmethod
