@@ -1,6 +1,8 @@
 import os, hashlib, traceback, time, datetime
-from urllib.request import Request, urlopen
-from .si_prefix import si_format
+try:
+    from urllib.request import Request, urlopen
+except ImportError:
+    from urllib2 import Request, urlopenfrom .si_prefix import si_format
 from ..ui.progressbar import ProgressBar
 
 

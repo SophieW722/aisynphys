@@ -1,3 +1,4 @@
+# coding: utf8
 """
 SI prefix scaling borrowed form pyqtgraph
 """
