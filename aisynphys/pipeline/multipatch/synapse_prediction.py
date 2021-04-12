@@ -1,9 +1,6 @@
 # coding: utf8
 from __future__ import print_function, division
 
-import os
-import pyqtgraph as pg
-from ... import config
 from .pipeline_module import MultipatchPipelineModule
 from .experiment import ExperimentPipelineModule
 from .dataset import DatasetPipelineModule

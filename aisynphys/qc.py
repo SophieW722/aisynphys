@@ -3,8 +3,8 @@
 QC functions meant to ensure consistent filtering across different analyses
 """
 import numpy as np
-import pyqtgraph as pg
 from neuroanalysis.util.data_test import DataTestCase
+from .util.si_prefix import si_format
 
 
 def recording_qc_pass(rec):
@@ -36,24 +36,24 @@ def recording_qc_pass(rec):
     if rec.baseline_current is None:
        failures.append('unknown baseline current')
     elif rec.baseline_current < -800e-12 or rec.baseline_current > 800e-12:
-       failures.append('baseline current of %s is outside of bounds [-800pA, 800pA]' % pg.siFormat(rec.baseline_current, suffix='A'))
+       failures.append('baseline current of %s is outside of bounds [-800pA, 800pA]' % si_format(rec.baseline_current, suffix='A'))
     
     if rec.clamp_mode == 'ic':
         if rec.baseline_potential is None:
             failures.append('baseline potential is None')
         elif rec.baseline_potential < -85e-3 or rec.baseline_potential > -45e-3:
-            failures.append('baseline potential of %s is outside of bounds [-85mV, -45mV]' % pg.siFormat(rec.baseline_potential, suffix='V'))
+            failures.append('baseline potential of %s is outside of bounds [-85mV, -45mV]' % si_format(rec.baseline_potential, suffix='V'))
         
         if rec.baseline_rms_noise is None:
             failures.append('no baseline_rms_noise for this recording')
         elif rec.baseline_rms_noise > 5e-3:
-            failures.append('baseline rms noise of %s exceeds 5mV' % pg.siFormat(rec.baseline_rms_noise, suffix='V'))
+            failures.append('baseline rms noise of %s exceeds 5mV' % si_format(rec.baseline_rms_noise, suffix='V'))
         
     elif rec.clamp_mode == 'vc':
         if rec.baseline_rms_noise is None:
             failures.append('no baseline_rms_noise for this recording')
         elif rec.baseline_rms_noise > 200e-12:
-           failures.append('baseline rms noise of %s exceeds 200pA' % pg.siFormat(rec.baseline_rms_noise, suffix='A'))
+           failures.append('baseline rms noise of %s exceeds 200pA' % si_format(rec.baseline_rms_noise, suffix='A'))
        
         
     data = rec['primary'].data
@@ -121,17 +121,17 @@ def pulse_response_qc_pass(post_rec, window, n_spikes, adjacent_pulses):
     if post_rec.clamp_mode == 'ic':
         base_potential = base
         if pre_pulse.std() > 1.5e-3:
-            [failures[k].append('STD of response window, %s, exceeds 1.5mV' % pg.siFormat(pre_pulse.std(), suffix='V')) for k in failures.keys()]
+            [failures[k].append('STD of response window, %s, exceeds 1.5mV' % si_format(pre_pulse.std(), suffix='V')) for k in failures.keys()]
         if data.data.max() > -40e-3:
-            [failures[k].append('Max in response window, %s, exceeds -40mV' % pg.siFormat(data.data.max(), suffix='V')) for k in failures.keys()]
+            [failures[k].append('Max in response window, %s, exceeds -40mV' % si_format(data.data.max(), suffix='V')) for k in failures.keys()]
         if max_amp > 10e-3:
-            [failures[k].append('Max response amplitude, %s, exceeds 10mV' % pg.siFormat(max_amp, suffix='V')) for k in failures.keys()]
+            [failures[k].append('Max response amplitude, %s, exceeds 10mV' % si_format(max_amp, suffix='V')) for k in failures.keys()]
     elif post_rec.clamp_mode == 'vc':
         base_potential = post_rec['command'].time_slice(window[0], window[1]).median()
         if pre_pulse.std() > 15e-12:
-            [failures[k].append('STD of response window, %s, exceeds 15pA' % pg.siFormat(pre_pulse.std(), suffix='A')) for k in failures.keys()]
+            [failures[k].append('STD of response window, %s, exceeds 15pA' % si_format(pre_pulse.std(), suffix='A')) for k in failures.keys()]
         if max_amp > 500e-12:
-            [failures[k].append('Max response amplitude, %s, exceeds 500pA' % pg.siFormat(max_amp, suffix='A')) for k in failures.keys()]
+            [failures[k].append('Max response amplitude, %s, exceeds 500pA' % si_format(max_amp, suffix='A')) for k in failures.keys()]
     else:
         raise TypeError('Unsupported clamp mode %s' % post_rec.clamp_mode)
 
@@ -146,9 +146,9 @@ def pulse_response_qc_pass(post_rec, window, n_spikes, adjacent_pulses):
     # and *base_potential*, which is just the median value over the IC pre_pulse window or VC command
     
     if not (ex_limits[0] < base_potential < ex_limits[1]): 
-        failures['ex'].append('Response window baseline of %s is outside of bounds [-85mV, -45mV]' % pg.siFormat(base_potential, suffix='V'))
+        failures['ex'].append('Response window baseline of %s is outside of bounds [-85mV, -45mV]' % si_format(base_potential, suffix='V'))
     if not (in_limits[0] < base_potential < in_limits[1]): 
-        failures['in'].append('Response window baseline of %s is outside of bounds [-60mV, -45mV]' % pg.siFormat(base_potential, suffix='V'))
+        failures['in'].append('Response window baseline of %s is outside of bounds [-60mV, -45mV]' % si_format(base_potential, suffix='V'))
     
     base2 = post_rec.baseline_potential
     if base2 is None:
@@ -156,9 +156,9 @@ def pulse_response_qc_pass(post_rec, window, n_spikes, adjacent_pulses):
         failures['in'].append('Unknown baseline potential for this recording')
     else:
         if not (ex_limits[0] < base2 < ex_limits[1]):
-            failures['ex'].append('Recording baseline of %s is outside of bounds [-85mV, -45mV]' % pg.siFormat(base2, suffix='V'))
+            failures['ex'].append('Recording baseline of %s is outside of bounds [-85mV, -45mV]' % si_format(base2, suffix='V'))
         if not (in_limits[0] < base2 < in_limits[1]):
-            failures['in'].append('Recording baseline of %s is outside of bounds [-60mV, -45mV]' % pg.siFormat(base2, suffix='V'))
+            failures['in'].append('Recording baseline of %s is outside of bounds [-60mV, -45mV]' % si_format(base2, suffix='V'))
     
     
     ex_qc_pass = len(failures['ex'])==0 
