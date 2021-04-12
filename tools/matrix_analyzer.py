@@ -3,6 +3,8 @@ import pyqtgraph as pg
 from aisynphys.database import default_db as db
 from aisynphys.matrix_analyzer import MatrixAnalyzer
 from collections import OrderedDict
+from aisynphys import config
+
 
 if __name__ == '__main__':
 
@@ -12,7 +14,7 @@ if __name__ == '__main__':
     # pg.setConfigOption('background', 'w')
     # pg.setConfigOption('foreground', 'k')
 
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(parents=[config.parser])
     parser.add_argument('--mode', type=str, default='external')
     parser.add_argument('--debug', action='store_true', default=False, help="Raise a pyqtgraph debug console.")
     args = parser.parse_args(sys.argv[1:])
