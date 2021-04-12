@@ -18,6 +18,11 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
     dependencies = [OptoSlicePipelineModule]
     table_group = ['experiment', 'electrode', 'cell', 'pair']
 
+    # @classmethod
+    # def create_db_entries(cls, job, session, expt=None):
+    #     import profile
+    #     profile.runctx('cls.create_db_entries_real(job, session, expt)', globals(), {'cls':cls, 'job':job, 'session':session, 'expt':expt}, filename='expt_profile_%s.txt'%job['job_id'])
+
     @classmethod
     def create_db_entries(cls, job, session, expt=None):
         """Generate DB entries for *job_id* and add them to *session*.
