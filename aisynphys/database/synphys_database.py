@@ -58,6 +58,7 @@ class SynphysDatabase(Database):
     def __init__(self, ro_host, rw_host, db_name):
         from .schema import ORMBase
         Database.__init__(self, ro_host, rw_host, db_name, ORMBase)
+        self._check_version()
         
     def create_tables(self, tables=None):
         """This method is used when initializing a new database or new tables within an existing database.
@@ -78,13 +79,14 @@ class SynphysDatabase(Database):
             s.add(mrec)
             s.commit()
         else:
+            self._check_version()
+
+    def _check_version(self):
+        mrec = self.metadata_record()
+        if mrec is not None:
             ver = mrec.meta['db_version']
-            assert ver == schema_version, "Database has unsupported schema version %s (expected %s)"%(ver, schema_version)
+            assert ver == schema_version, f"Database {self} has unsupported schema version {ver} (expected {schema_version})"
     
-    @property
-    def metadata(self):
-        return self.metadata_record.meta.copy()
-        
     def metadata_record(self, session=None):
         session = session or self.default_session
         recs = session.query(self.Metadata).all()
