@@ -127,14 +127,16 @@ class OptoCortexLocationPipelineModule(DatabasePipelineModule):
             ## fill in lateral_distance and vertical_distance for each pair
             if cortex.get('sliceAngle') is not None:
                 angle = cortex.get('sliceAngle') * np.pi/180.
+                sinA = np.sin(angle)
+                cosA = np.cos(angle)
                 for pair_entry in expt_entry.pair_list:
                     pre_cell_pos = pair_entry.pre_cell.position
                     post_cell_pos = pair_entry.post_cell.position
                     if pre_cell_pos is None or post_cell_pos is None:
                         continue
                     x1, y1 = post_cell_pos[0]-pre_cell_pos[0], post_cell_pos[1] - pre_cell_pos[1]
-                    x2 = abs(np.cos(angle)*x1 - np.sin(angle)*y1)
-                    y2 = abs(np.sin(angle)*x1 + np.cos(angle)*y1)
+                    x2 = abs(cosA*x1 - sinA*y1)
+                    y2 = abs(sinA*x1 + cosA*y1)
                     pair_entry.lateral_distance = x2
                     pair_entry.vertical_distance = y2
 
