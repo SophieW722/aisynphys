@@ -52,14 +52,24 @@ if os.path.isfile(configfile):
 
 # intercept specific command line args
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument('--db-version', default=None, dest='db_version')
-parser.add_argument('--db-host', default=None, dest='db_host')
-parser.add_argument('--database', default=None)
+parser.add_argument('--db-version', default=None, dest='db_version', help="Name of a published DB version to use. Sqlite file will be downloaded if necessary. (see --list-db-versions)")
+parser.add_argument('--list-db-versions', default=False, action='store_true', dest='list_db_versions', help="Print the list of published DB versions and exit.")
+parser.add_argument('--db-host', default=None, dest='db_host', help="Database host string to use (e.g. 'postgresql://user:password@hostname' or 'sqlite:///')")
+parser.add_argument('--database', default=None, help="Name of postgres database or sqlite file to use")
 
 args, unknown_args = parser.parse_known_args()
 sys.argv = sys.argv[:1] + unknown_args
 
+if args.list_db_versions:
+    from .synphys_cache import list_db_versions
+    for k in list_db_versions():
+        print("  ", k)
+    sys.exit(0)
+
+
 if args.db_version is not None:
+    assert args.db_host is None, "Cannot specify --db-version and --db-host together"
+    assert args.database is None, "Cannot specify --db-version and --database together"
     from .synphys_cache import get_db_path
     sqlite_file = get_db_path(args.db_version)
     synphys_db_host = "sqlite:///"
