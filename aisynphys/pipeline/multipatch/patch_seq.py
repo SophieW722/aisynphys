@@ -8,12 +8,13 @@ from __future__ import print_function, division
 import os, datetime, shutil, tempfile, hashlib
 import pandas as pd
 from collections import OrderedDict
-from ...util import timestamp_to_datetime, optional_import
 from ... import config
 from .pipeline_module import MultipatchPipelineModule
 from .experiment import ExperimentPipelineModule
+from acq4.util.DataManager import getHandle
+from ...util import optional_import
 pyodbc = optional_import('pyodbc')
-getHandle = optional_import('acq4.util.DataManager', 'getHandle')
+
 
 amp_cols = {
             'Comment': 'meta',

@@ -1,6 +1,6 @@
 import re
 from collections import OrderedDict
-from ..util import toposort
+from ..util.toposort import toposort
 from .pipeline_module import PipelineModule, DatabasePipelineModule
 
 
@@ -27,9 +27,12 @@ class Pipeline(object):
         deps = {c:c.upstream_modules() for c in self.modules if type(c) not in excluded}
         self._sorted_modules = OrderedDict([(mod.name, mod) for mod in toposort(deps)])
 
-    def sorted_modules(self):
+    def sorted_modules(self, start=None, end=None):
         """Return an ordered dictionary mapping {name: module} of all modules in this pipeline,
         topologically sorted by dependencies (least dependent to most dependent).
+
+        If *start* is given, then list only that module and the ones that depend on it.
+        if *end* is given, list only that module and the ones it depends on.
         """
         return self._sorted_modules
     

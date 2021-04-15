@@ -1,10 +1,7 @@
 # coding: utf8
 from __future__ import print_function, division
 
-import os, random
 from sqlalchemy.orm import contains_eager, undefer
-import pyqtgraph as pg
-from ... import config
 from .pipeline_module import MultipatchPipelineModule
 from .dataset import DatasetPipelineModule
 from .synapse import SynapsePipelineModule

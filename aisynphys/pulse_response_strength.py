@@ -5,15 +5,13 @@ Analyses that measure the strength of synaptic connections.
 """
 from __future__ import print_function, division
 
-import sys, multiprocessing, time, warnings
+import warnings
 
 import numpy as np
-import pyqtgraph as pg
 
-from neuroanalysis.data import TSeries
 from neuroanalysis import filter
 from neuroanalysis.event_detection import exp_deconvolve, exp_reconvolve, exp_deconv_psp_params
-from neuroanalysis.fitting import fit_psp, Psp, SearchFit, fit_scale_offset
+from neuroanalysis.fitting import fit_psp, Psp, fit_scale_offset
 from neuroanalysis.baseline import float_mode
 
 from .database import default_db as db

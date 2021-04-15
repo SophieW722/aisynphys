@@ -3,7 +3,7 @@ try:
     from urllib.request import urlopen
 except ImportError:
     from urllib2 import urlopen
-from .util import iter_download_with_resume
+from .util.download import iter_download_with_resume
 
 
 warehouse_url = 'http://iwarehouse'

@@ -30,11 +30,11 @@ class MultipatchPipeline(Pipeline):
         SynapsePipelineModule,
         GapJunctionPipelineModule,
         PulseResponsePipelineModule,
-        SynapsePredictionPipelineModule,
         RestingStatePipelineModule,
         DynamicsPipelineModule,
         CortexLocationPipelineModule,
         SynapseModelPipelineModule,
+        SynapsePredictionPipelineModule,
     ]
     
     def __init__(self, database, config):

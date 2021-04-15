@@ -30,6 +30,7 @@ rig_name = None
 n_headstages = 8
 rig_data_paths = {}
 known_addrs = {}
+pipeline = {}
 
 
 configfile = os.path.join(os.path.dirname(__file__), '..', 'config.yml')

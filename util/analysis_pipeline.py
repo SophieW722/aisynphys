@@ -45,20 +45,25 @@ if __name__ == '__main__':
 
     all_modules = pipeline.sorted_modules()
     
+    enabled_modules = all_modules.copy()
+    for module in config.pipeline.get('disable_modules', []):
+        print(f"Module '{module}' disabled in config")
+        del enabled_modules[module]
+    
     if 'all' in args.modules:
-        modules = list(all_modules.values())
+        modules = list(enabled_modules.values())
     else:
         modules = []
         for mod in args.modules:
             try:
                 if mod.startswith(':'):
-                    i = list(all_modules.keys()).index(mod[1:])
-                    modules.extend(list(all_modules.values())[:i+1])
+                    i = list(enabled_modules.keys()).index(mod[1:])
+                    modules.extend(list(enabled_modules.values())[:i+1])
                 elif mod.endswith(':'):
-                    i = list(all_modules.keys()).index(mod[:-1])
-                    modules.extend(list(all_modules.values())[i:])
+                    i = list(enabled_modules.keys()).index(mod[:-1])
+                    modules.extend(list(enabled_modules.values())[i:])
                 else:
-                    modules.append(all_modules[mod])
+                    modules.append(enabled_modules[mod])
             except (KeyError, ValueError):
                 print('Unknown analysis module "%s"; options are: %s' % (mod, list(all_modules.keys())))
                 sys.exit(-1)

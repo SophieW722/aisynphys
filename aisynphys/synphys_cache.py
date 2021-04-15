@@ -1,7 +1,6 @@
-import os, sys, glob, pickle, base64, urllib, json, re
-from collections import OrderedDict
+import os, pickle, base64, urllib, json, re
 from . import config
-from .util import sync_file, dir_timestamp, interactive_download
+from .util.download import interactive_download
 
 
 _db_versions = None
