@@ -1,0 +1,19 @@
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  - python=3
+  - pyqt=5.12
+  - h5py
+  - numpy
+  - sqlalchemy
+  - scipy
+  - psycopg2
+  - statsmodels
+  - pandas
+  - pyyaml
+  - pyodbc
+  - xlrd
+  - numba
+  - openpyxl
+  - jupyter
