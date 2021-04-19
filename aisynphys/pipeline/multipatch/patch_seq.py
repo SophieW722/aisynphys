@@ -11,8 +11,8 @@ from collections import OrderedDict
 from ... import config
 from .pipeline_module import MultipatchPipelineModule
 from .experiment import ExperimentPipelineModule
-from acq4.util.DataManager import getHandle
 from ...util import optional_import
+getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 pyodbc = optional_import('pyodbc')
 
 

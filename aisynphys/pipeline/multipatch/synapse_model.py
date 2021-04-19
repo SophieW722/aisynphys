@@ -11,7 +11,11 @@ import numpy as np
 from ...dynamics import generate_pair_dynamics
 from .pipeline_module import MultipatchPipelineModule
 from .experiment import ExperimentPipelineModule
-from ...stochastic_release_model import list_cached_results, load_cache_file, StochasticReleaseModel
+from neuroanalysis.util.optional_import import optional_import
+list_cached_results, load_cache_file, StochasticReleaseModel = optional_import(
+    'aisynphys.stochastic_release_model', 
+    ['list_cached_results', 'load_cache_file', 'StochasticReleaseModel']
+    )
 from ...util import datetime_to_timestamp, timestamp_to_datetime
 from .dynamics import generate_pair_dynamics
 
