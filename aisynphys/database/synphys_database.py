@@ -25,6 +25,26 @@ class SynphysDatabase(Database):
         return cls(ro_host, rw_host, db_name=sqlite_file)
     
     @classmethod
+    def load_current(cls, db_size):
+        """Load the most recent version of the database that is supported by this version
+        of aisynphys.
+
+        The database file will be downloaded and cached, if an existing cache file is not found.
+
+        Parameters
+        ----------
+        db_size : str
+            Must be one of 'small', 'medium', or 'full'.
+        """
+        assert db_size in ('small', 'medium', 'full'), "db_size argument must be one of 'small', 'medium', or 'full'"
+        versions_available = list_db_versions()
+        supported = [name for name, desc in versions_available.items() if desc.get('schema_version') == cls.schema_version and f"_{db_size}.sqlite" in name]
+        if len(supported) == 0:
+            raise Exception(f"This version of aisynphys requires database schema version {cls.schema_version}, but no released database files were found with this schema version.")
+        current = sorted(supported)[-1]
+        return cls.load_version(current)
+
+    @classmethod
     def list_versions(cls):
         """Return a list of the available database versions.
         """
@@ -35,7 +55,7 @@ class SynphysDatabase(Database):
         """Load a named database version.
         
         Available database names can be listed using :func:`list_versions`.
-        The database file will be downloaded and cached, if an existing cache file is not found.
+        The database file will be downloaded and cached, if an existing cache file is not found.        
 
         Example::
 
