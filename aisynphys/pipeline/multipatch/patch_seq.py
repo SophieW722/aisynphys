@@ -50,6 +50,7 @@ mapping_cols = {
             'marker_sum_norm_label': 'norm_marker_sum',
             'last_map': 'last_map',
             'last_score': 'last_score',
+            'batch_vendor_name': 'batch',
             }
 
 col_names = amp_cols.copy()

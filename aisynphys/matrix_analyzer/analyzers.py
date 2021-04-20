@@ -1094,16 +1094,17 @@ class CellAnalyzer(pg.QtCore.QObject):
         ]
 
         self.patchseq_fields = [
+            ('tube_id', {'mode': 'enum'}),
             ('nucleus', {'mode': 'enum', 'values': ['+', '-', '?'], 'defaults': {
                 'colormap':
                 [(0, 255, 0, 255), (255, 0, 0, 255), (0, 0, 255, 255)]
                 }}),
             ('area_400_10000bp', {'mode': 'range'}),
             ('picogreen_yield', {'mode': 'range'}),
-            ('tree_call', {'mode': 'enum', 'values': ['I3', 'I2', 'I1', 'Core'],
+            ('tree_call', {'mode': 'enum', 'values': ['PoorQ', 'I3', 'I2', 'I1', 'Core'],
                         'defaults': {
                                 'colormap':
-                                [(255, 0, 0, 255), (255, 170, 0, 255), (0, 0, 255, 255), (0, 255, 0, 255)]
+                                [(169, 169, 169, 255), (255, 0, 0, 255), (255, 170, 0, 255), (0, 0, 255, 255), (0, 255, 0, 255)]
                         },
                     }),
             ('t_type', {'mode': 'enum'}),
