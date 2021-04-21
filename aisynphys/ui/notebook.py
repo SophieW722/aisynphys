@@ -701,7 +701,7 @@ def data_matrix(data_df, cell_classes, metric=None, scale=1, unit=None, cmap=Non
     return data_rgb, data_str
 
 
-def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, color='k', avg_line=True, avg_trace=False):
+def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=True, avg_trace=False, scatter_args={}, line_args={}):
     qc_pass_data = stim_sorted_pulse_amp(pair)
 
     # scatter plots of event amplitudes sorted by pulse number 
@@ -716,13 +716,19 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, color='k', avg_line=True, avg
     ax.set_ylim(0, filtered['fit_amp'].max())
     ax.set_xlim(0, 13)
 
-    sns.swarmplot(x='pulse_number', y='fit_amp', data=filtered, color=(0.7, 0.7, 0.7), size=3, ax=ax)
+    scatter_opts = {'color': (0.7, 0.7, 0.7, ), 'size': 3}
+    scatter_opts.update(scatter_args)
+    sns.swarmplot(x='pulse_number', y='fit_amp', data=filtered, ax=ax, **scatter_opts)
+    ax.get_legend().remove()
+    
 
+    line_opts = {'color': 'k', 'linewidth': 2, 'zorder': 100}
+    line_opts.update(line_args)
     # plot a line at the average of all pulses of the same number
     if avg_line:
         pulse_means = filtered.groupby('pulse_number').mean()['fit_amp'].to_list()
-        ax.plot(range(0,8), pulse_means[:8], color=color, linewidth=2, zorder=100)
-        ax.plot(range(8,12), pulse_means[8:12], color=color, linewidth=2, zorder=100)
+        ax.plot(range(0,8), pulse_means[:8], **line_opts)
+        ax.plot(range(8,12), pulse_means[8:12], **line_opts)
     # plot avg trace for each pulse number
     if avg_trace:
         for pulse_number in np.arange(1,13):
@@ -732,7 +738,7 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, color='k', avg_line=True, avg
             post_trace = pr_list.post_tseries(align='spike', bsub=True, bsub_win=1e-3)
             trace_mean = post_trace.mean()*1e3
             trace_slice = trace_mean.time_slice(-1e-3, 8e-3)
-            ax.plot(trace_slice.time_values*1e2 + (pulse_number-1.4), abs(trace_slice.data),  color=color, zorder=100)
+            ax.plot(trace_slice.time_values*1e2 + (pulse_number-1.4), abs(trace_slice.data),  **line_opts)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
