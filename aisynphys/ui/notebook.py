@@ -710,15 +710,15 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=Fal
 
     sign = 1 if pair.synapse.synapse_type == 'ex' else -1
     try:
-        filtered['fit_amp'] *= sign * 1000
+        filtered['dec_fit_reconv_amp'] *= sign * 1000
     except KeyError:
         print('No fit amps for pair: %s' % pair)
-    ax.set_ylim(0, filtered['fit_amp'].max())
+    ax.set_ylim(0, filtered['dec_fit_reconv_amp'].max())
     ax.set_xlim(0, 13)
 
     scatter_opts = {'color': (0.7, 0.7, 0.7, ), 'size': 3}
     scatter_opts.update(scatter_args)
-    sns.swarmplot(x='pulse_number', y='fit_amp', data=filtered, ax=ax, **scatter_opts)
+    sns.swarmplot(x='pulse_number', y='dec_fit_reconv_amp', data=filtered, ax=ax, **scatter_opts)
     ax.get_legend().remove()
     
 
@@ -726,7 +726,7 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=Fal
     line_opts.update(line_args)
     # plot a line at the average of all pulses of the same number
     if avg_line:
-        pulse_means = filtered.groupby('pulse_number').mean()['fit_amp'].to_list()
+        pulse_means = filtered.groupby('pulse_number').mean()['dec_fit_reconv_amp'].to_list()
         ax.plot(range(0,8), pulse_means[:8], **line_opts)
         ax.plot(range(8,12), pulse_means[8:12], **line_opts)
     # plot avg trace for each pulse number
