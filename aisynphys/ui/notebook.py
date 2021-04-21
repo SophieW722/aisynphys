@@ -701,7 +701,7 @@ def data_matrix(data_df, cell_classes, metric=None, scale=1, unit=None, cmap=Non
     return data_rgb, data_str
 
 
-def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=True, avg_trace=False, scatter_args={}, line_args={}):
+def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=False, scatter_args={}, line_args={}):
     qc_pass_data = stim_sorted_pulse_amp(pair)
 
     # scatter plots of event amplitudes sorted by pulse number 
