@@ -4,6 +4,7 @@ channels:
 dependencies:
   - python=3
   - pyqt=5.12
+  - pyqtgraph
   - pip
   - h5py
   - pillow
