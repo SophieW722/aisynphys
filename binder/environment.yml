@@ -1,20 +1,24 @@
+channels:
+  - conda-forge
+  - defaults
 dependencies:
   - python=3
-  - pyqt
+  - pyqt=5.12
   - pip
   - h5py
   - pillow
   - psycopg2
   - sqlalchemy
   - matplotlib
+  - jupyter
   - pandas
+  - seaborn
   - scipy
-  - numba
   - pyyaml
+  - numba
   - scikit-image
   - scikit-learn
   - statsmodels
   - pip:
     - lmfit
-    
-    
+

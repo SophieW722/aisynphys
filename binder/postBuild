@@ -10,4 +10,5 @@ git clone https://github.com/AllenInstitute/aisynphys --branch=current-release -
 cd aisynphys
 python setup.py develop
 
-python util/database.py --db-version=synphys_r1.0_2019-08-29_small.sqlite
+# download and cache DB file
+python util/database.py --db-version=synphys_r2.0_pre3_small.sqlite
