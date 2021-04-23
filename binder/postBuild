@@ -11,4 +11,4 @@ cd aisynphys
 python setup.py develop
 
 # download and cache DB file
-python util/database.py --db-version=synphys_r2.0_pre3_small.sqlite
+python util/database.py --db-version=synphys_r2.0-pre3_small.sqlite
