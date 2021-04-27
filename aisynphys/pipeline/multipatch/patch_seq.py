@@ -78,7 +78,7 @@ class PatchSeqPipelineModule(MultipatchPipelineModule):
         cell_species = get_cell_species(db)
 
         path = os.path.join(config.synphys_data, expt.storage_path)
-        site_info = getHandle(path).info()
+        site_info = getDirHandle(path).info()
         headstages = site_info.get('headstages')
         if headstages is not None:
             patchseq_tubes = {hs_name.split('HS')[1]: hs['Tube ID'] for hs_name, hs in headstages.items()}
@@ -171,7 +171,7 @@ class PatchSeqPipelineModule(MultipatchPipelineModule):
             ready[expt_id] = {'dep_time': expt_mtime}
 
             path = os.path.join(config.synphys_data, expt.storage_path)
-            site_info = getHandle(path).info()
+            site_info = getDirHandle(path).info()
             headstages = site_info.get('headstages')
             if headstages is None:
                 continue
