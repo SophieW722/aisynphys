@@ -58,6 +58,7 @@ class SynphysDatabase(Database):
     def __init__(self, ro_host, rw_host, db_name):
         from .schema import ORMBase
         Database.__init__(self, ro_host, rw_host, db_name, ORMBase)
+        self._project_names = None
         self._check_version()
         
     def create_tables(self, tables=None):
@@ -145,6 +146,12 @@ class SynphysDatabase(Database):
         session = session or self.default_session
         return session.query(self.Experiment).all()
 
+    def list_project_names(self, session=None, cache=True):
+        session = session or self.default_session
+        if cache is False or self._project_names is None:
+            self._project_names = [rec[0] for rec in session.query(self.Experiment.project_name).distinct().all()]
+        return self._project_names
+
     def pair_query(self, pre_class=None, post_class=None, synapse=None, synapse_type=None, electrical=None, 
                    project_name=None, acsf=None, age=None, species=None, distance=None, internal=None, 
                    preload=(), session=None, filter_exprs=None):
@@ -230,12 +237,17 @@ class SynphysDatabase(Database):
             query = query.filter(self.Pair.has_synapse==synapse)
 
         if synapse_type is not None:
+            assert synapse_type in ['ex', 'in', 'mixed'], "synapse_type must be 'ex', 'in', or 'mixed'"
             query = query.filter(self.Synapse.synapse_type==synapse_type)
 
         if electrical is not None:
             query = query.filter(self.Pair.has_electrical==electrical)
 
         if project_name is not None:
+            names = [project_name] if isinstance(project_name, str) else project_name
+            for name in names:
+                assert name in self.list_project_names(), f"project_name '{name}' not found in database (see SynphysDatabase.list_project_names)"
+
             if isinstance(project_name, str):
                 query = query.filter(self.Experiment.project_name==project_name)
             else:
