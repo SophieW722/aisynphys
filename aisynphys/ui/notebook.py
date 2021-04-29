@@ -339,7 +339,11 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         else:
             colors = palette
         c2 = [[c]*len(y_vals[i]) for i, c in enumerate(colors)]
-        x_vals = swarm(y_vals)
+        if cmap_log:
+            x_vals = swarm([[np.log(y) for y in group] for group in y_vals])
+            ax[i].set_yscale('log')
+        else:
+            x_vals = swarm(y_vals)
         ax[i].scatter(np.concatenate(x_vals), np.concatenate(y_vals), color=np.concatenate(c2), **plot_args)
         plot = sns.barplot(x='pair_class', y=metric, data=pairs_has_metric, ax=ax[i], ci=None, facecolor=(1, 1, 1, 0), edgecolor='black', order=pair_classes, estimator=estimator)
         
@@ -353,8 +357,6 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         label = '\n'.join(wrap(label, 20))
         ax[i].set_ylabel(label, size=10)
         ax[i].set_yticklabels([], minor=True)
-        if cmap_log:
-            ax[i].set_yscale('log')
         ax[i].spines['right'].set_visible(False)
         ax[i].spines['top'].set_visible(False)
         ax[i].yaxis.set_ticks_position('left')
