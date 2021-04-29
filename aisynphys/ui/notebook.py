@@ -714,7 +714,7 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=Fal
 
     # scatter plots of event amplitudes sorted by pulse number 
     mask = qc_pass_data['induction_frequency'] == ind_f
-    filtered = qc_pass_data[mask]
+    filtered = qc_pass_data[mask].copy()
 
     sign = 1 if pair.synapse.synapse_type == 'ex' else -1
     try:
@@ -727,7 +727,9 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=Fal
     scatter_opts = {'color': (0.7, 0.7, 0.7, ), 'size': 3}
     scatter_opts.update(scatter_args)
     sns.swarmplot(x='pulse_number', y='dec_fit_reconv_amp', data=filtered, ax=ax, **scatter_opts)
-    ax.get_legend().remove()
+    leg = ax.get_legend()
+    if leg is not None:
+        leg.remove()
     
 
     line_opts = {'color': 'k', 'linewidth': 2, 'zorder': 100}
