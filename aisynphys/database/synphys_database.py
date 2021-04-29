@@ -86,7 +86,7 @@ class SynphysDatabase(Database):
         mrec = self.metadata_record()
         if mrec is not None:
             ver = mrec.meta['db_version']
-            assert ver == schema_version, f"Database {self} has unsupported schema version {ver} (expected {schema_version})"
+            assert ver == schema_version, "Database {self} has unsupported schema version {ver} (expected {schema_version})".format(locals())
     
     def metadata_record(self, session=None):
         session = session or self.default_session
@@ -246,7 +246,7 @@ class SynphysDatabase(Database):
         if project_name is not None:
             names = [project_name] if isinstance(project_name, str) else project_name
             for name in names:
-                assert name in self.list_project_names(), f"project_name '{name}' not found in database (see SynphysDatabase.list_project_names)"
+                assert name in self.list_project_names(), "project_name '{name}' not found in database (see SynphysDatabase.list_project_names)".format(locals())
 
             if isinstance(project_name, str):
                 query = query.filter(self.Experiment.project_name==project_name)
