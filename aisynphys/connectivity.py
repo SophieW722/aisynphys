@@ -868,7 +868,9 @@ class CorrectionMetricFunctions:
             return np.nan
 
         p = db.query(db.Pair).filter(db.Pair.id==pair.id).all()[0]
-        return(getattr(p, 'n_%s_test_spikes' % syn_type))
+        n_spikes = getattr(p, 'n_%s_test_spikes' % syn_type)
+        n_spikes = n_spikes if n_spikes <= 800 else 800
+        return n_spikes            
 
     def baseline_rms_noise(pair):
         post_cell = pair.post_cell
