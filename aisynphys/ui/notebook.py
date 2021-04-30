@@ -208,6 +208,11 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                     cp, cp_lower_ci, cp_upper_ci = result['gap_probability']
             else:
                 raise Exception('ctype must be one of "chemical" or "electrical"')
+            
+            if not correction_only:
+                cp = min(cp, 1)
+                cp_upper_ci = min(1, cp_upper_ci)
+                cp_lower_ci = max(0, cp_lower_ci)
 
             cprob[i,j] = cp
             if ctype == 'chemical':
@@ -216,9 +221,10 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                     cprob_str[i,j] += "\n %.3f" %(cp)
             elif ctype == 'electrical':
                 cprob_str[i,j] = "" if result['n_gaps_probed'] == 0 else "%d/%d" % (found, result['n_gaps_probed'])
-            cp_upper_ci = min(1, cp_upper_ci)
-            cp_lower_ci = max(0, cp_lower_ci)
+
+            
             cprob_alpha[i,j] = 1.0 - 1.0 * max(cp_upper_ci - cp, cp - cp_lower_ci)
+
 
     # map connection probability to RGB colors
     mapper = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
@@ -276,9 +282,9 @@ def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_
         'paired_event_correlation_4_8_r':     ('Paired event correlation 4:8',      '',    1,    1,     [db.Dynamics.paired_event_correlation_4_8_r],      'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
         'junctional_conductance':             ('Junctional Conductance',            'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],           'viridis',     False,  (0, 10),       "%0.2f"),
         'coupling_coeff_pulse':               ('Coupling Coefficient',              '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],             'viridis',     False,  (0, 1),        "%0.2f"),
-        'variability_resting_state':          ('log(Resting state variance)',       '',    1,    1,     [db.Dynamics.variability_resting_state],           'viridis',     False,  (-1, 1),       "%0.2f"),
-        'variability_second_pulse_50hz':      ('log(second pulse variance)',         '',    1,    1,    [db.Dynamics.variability_second_pulse_50hz],       'viridis',     False,  (-1, 1),       "%0.2f"),
-        'variability_stp_induced_state_50hz': ('log(STP induced variance)',         '',    1,    1,     [db.Dynamics.variability_stp_induced_state_50hz],  'viridis',     False,  (-1, 1),       "%0.2f"),
+        'variability_resting_state':          ('log(Resting state aCV)',       '',    1,    1,     [db.Dynamics.variability_resting_state],           'viridis',     False,  (-1, 1),       "%0.2f"),
+        'variability_second_pulse_50hz':      ('log(second pulse aCV)',         '',    1,    1,    [db.Dynamics.variability_second_pulse_50hz],       'viridis',     False,  (-1, 1),       "%0.2f"),
+        'variability_stp_induced_state_50hz': ('log(STP induced aCV)',         '',    1,    1,     [db.Dynamics.variability_stp_induced_state_50hz],  'viridis',     False,  (-1, 1),       "%0.2f"),
     } 
     if metrics is None:
         metrics = synapse_metrics
@@ -378,7 +384,7 @@ def metric_stats(metric, db, pre_classes, post_classes, pair_query_args):
 def ei_hist_plot(ax, metric, bin_edges, db, pair_query_args):
     ei_classes = {'ex': CellClass(cell_class='ex'), 'in': CellClass(cell_class='in')}
     
-    pairs_has_metric, metric_name, units, scale, _, _, _, _, _ = get_metric_data(metric, db, ei_classes, ei_classes, pair_query_args=pair_query_args)
+    pairs_has_metric, metric_name, units, scale, _, _, log_scale, _, _ = get_metric_data(metric, db, ei_classes, ei_classes, pair_query_args=pair_query_args)
     ex_pairs = pairs_has_metric[pairs_has_metric['pre_class']=='ex']
     in_pairs = pairs_has_metric[pairs_has_metric['pre_class']=='in']
     if 'amp' in metric:
