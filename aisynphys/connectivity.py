@@ -832,6 +832,191 @@ class BinaryModel(ConnectivityModel):
         return ret
 
 
+class CorrectionModel(ConnectivityModel):
+    """ Connectivity model with corrections for potential biases
+    Gaussian is used for distance-adjustment.
+
+    Parameters
+    ----------
+    pmax : float
+        Maximum connection probability (at 0 intersomatic distance)
+    size : float
+        Gaussian sigma for distance-adjustment
+    correction_variables : list of strings
+        Names of correction variables.
+        These names should be defined in each Pair in pair_groups when measure_connectivity is called.
+    correction_functions : list of functions
+        Functions used to correct estimating connection probability.
+        The following formats need to be valid to execute properly.
+        correction_functions[i](correction_parameters[excinh][i], pair[correction_variables[i]])
+        where is a Pair instance in pair_group (1st argument of measure_connectivity)
+    correction_parameters : list of list of [array or [list of float]]
+        Parameters used aside with correction_variables. Fixed during the fit.
+        The first index is 0 (pre-synaptic excitatory) or 1 (pre-synaptic inhibitory)
+        
+    Note: correction_variables, correction_parameters, and correction_functions should have the same lengths.
+    """
+    def __init__(self, pmax, size, correction_variables, correction_functions, correction_parameters, do_minos=True):
+        self.pmax = pmax
+        self.size = size
+        self.correction_variables = correction_variables # list of strings (names of correction variables)
+        self.correction_functions = correction_functions # list of functions
+        self.correction_parameters = correction_parameters # list of list of parameters for correction functions
+        self.do_minos = do_minos
+
+    def dist_gaussian(self, p_sigma, v_dist):
+        return (np.exp(-1.0 * v_dist ** 2 / (2.0 * p_sigma ** 2)))
+
+    def connection_probability(self, x):
+        # x is expected to be [distance, correction_var1, correction_var2,...].
+        # the final probability is modeled as a product of multiple corrections.
+        distancepart = self.dist_gaussian(self.size, x[0])
+        correction = 1.0
+        for i in range(1, len(x)):
+            # replace None with nan to make the following code to work
+            v = [np.nan if el is None else el for el in x[i]]
+            corrval = self.correction_functions[i-1](self.correction_parameters[self.excinh][i-1], v)
+            correction *= np.nan_to_num(corrval, nan=1.0)
+        return np.clip(self.pmax * distancepart * correction, 0.0, 1.0)
+
+    @classmethod
+    def nll(cls, pmax, inst, x, conn):
+        inst.pmax = pmax # override existing value
+        return -inst.likelihood(x, conn)
+
+    @classmethod
+    def fit(cls, inst, x, conn, init=(0.1), bounds=((0.0, 3.0)), excinh=None, **kwds):
+        inst.excinh = excinh # setting the cell class...
+        fit = iminuit.minimize(
+                        cls.nll,
+                        x0=init, 
+                        args=(inst, x, conn),
+                        bounds=bounds,
+                        **kwds,
+                    )
+        cp = np.nan if len(conn) == 0 else fit.x
+
+        # to calculate CI, get the adjustment values from the instance.
+        inst.pmax = 1.0
+        mean_adjustment = inst.connection_probability(x).mean()
+
+        n_conn = conn.sum()
+        n_test = len(conn)
+        est_pmax = (n_conn / n_test) / mean_adjustment
+    
+        # and for the CI, we can just use a standard binomial confidence interval scaled by the same factor
+        lower, upper = connection_probability_ci(n_conn, n_test)
+
+        lower = lower / mean_adjustment - est_pmax + cp
+        upper = upper / mean_adjustment - est_pmax + cp
+
+        fit.cp_ci = (cp, lower, upper)
+        return fit
+
+
+class ErfModel(ConnectivityModel):
+    """Model connection probability correction as error function
+
+    Parameters
+    ----------
+    pmax : float
+        Maximum connection probability (at 0 intersomatic distance)
+    size : float
+        Sigma of the integrand Gaussian of the error function
+    midpoint : float
+        Mu (center) of the integrand Gaussian of the error function
+
+    Note: You can give a constraint when this model is fit.
+    Pass a constrant argument (2-element tuple with (sigma_multiplier, stop_point)) to fit function.
+    The actual constraint equation is the following format.
+        midpoints + constraint[0] * size < constraint[1]
+    To make quartile saturation at quartile of the data point of detection power, use the following parameters.
+    constraint = (0.6745, 4.5655)
+    See Connectivity Corrections Fit.ipynb for more details.
+    """
+    def __init__(self, pmax, size, midpoint):
+        self.pmax = pmax
+        self.size = size
+        self.midpoint = midpoint
+    
+    def connection_probability(self, x):
+        return self.pmax / 2.0 * (1.0 + erf((x - self.midpoint) / (np.sqrt(2) * self.size)))
+
+    @staticmethod
+    def correction_func(params, x):
+        return 0.5 * (1.0 + erf((x - params[2]) / (np.sqrt(2) * params[1])))
+
+    @classmethod
+    def fit(cls, x, conn, init, bounds, constraint=None, fixed_size=False, fixed_max=False):
+        # constraint should be a 2-element tuple with (sigma_multiplier, stop_point)
+        if constraint == None:
+            fit = iminuit.minimize(
+                cls.err_fn,
+                x0=init,
+                args=(x, conn),
+                bounds=bounds,
+            )
+        else:
+            # midpoints + constraint[0] * size < constraint[1]
+            # to make it quartile of the detection power, use the following parameters
+            # constraint[0] == 0.6745 (specify quartile point using sigma)
+            # constraint[1] == 4.5655 observed value in the data (may change if the data change)
+            con_array = np.array([[0, constraint[0], 1]]) # 1 x 3 matrix
+            constraints = scipy.optimize.LinearConstraint(con_array, lb=-np.inf, ub=constraint[1])
+            fit = scipy.optimize.minimize(
+                cls.err_fn,
+                x0=init,
+                args=(x, conn),
+                bounds=bounds,
+                constraints=constraints
+            )
+        ret = cls(*fit.x)
+        ret.fit_result = fit
+        return ret
+
+
+class BinaryModel(ConnectivityModel):
+    """Model connection probability correction as binary function
+
+    Parameters
+    ----------
+    pmax : float
+        Maximum connection probability (at 0 intersomatic distance)
+    size : float
+        Threshold for applying adjustment. If variable < size, adjustment is applied.
+    adjustment : float
+        Ratio between adjusted and non-adjusted probability.
+        Resulting probability after adjustment is pmax * adjustment
+    """
+    def __init__(self, pmax, size, adjustment):
+        self.pmax = pmax
+        self.size = size
+        self.adjustment = adjustment
+    
+    def connection_probability(self, x):
+        val = np.ones_like(x)
+        val[x < self.size] *= self.adjustment
+        return self.pmax * val
+
+    @staticmethod
+    def correction_func(params, x):
+        val = np.ones_like(x)
+        val[x < params[1]] *= params[2]
+        return val
+
+    @classmethod
+    def fit(cls, x, conn, init, bounds, fixed_size=False, fixed_max=False):
+        fit = iminuit.minimize(
+            cls.err_fn,
+            x0=init,
+            args=(x, conn),
+            bounds=bounds,
+        )
+        ret = cls(*fit.x)
+        ret.fit_result = fit
+        return ret
+
+
 class FixedSizeModelMixin:
     @classmethod
     def fit(cls, x, conn, init=0.1, bounds=(0.001, 1), **kwds):
