@@ -205,8 +205,7 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
         if correction_model is not None:
             # Here it performs corrected p_max fit if there are relevant variables.
             if hasattr(correction_model, 'correction_variables'): # correction model.
-                correction_model.size = sigma # override it
-                variables = [distances[mask]]
+                variables = []
                 for variable in correction_model.correction_variables:
                     var_extract = np.array([getattr(p, variable) for p in probed_pairs], dtype=float)
                     variables.append(var_extract[mask])
@@ -217,7 +216,7 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
                 else:
                     excinh = 1
 
-                corr_fit = correction_model.fit(correction_model, variables, connections[mask], excinh=excinh)
+                corr_fit = correction_model.fit(variables, connections[mask], excinh=excinh)
                 if mask.sum() == 0: # no probing
                     corr_fit.x = np.nan # needed not to report the initial value
                 results[(pre_class, post_class)]['connectivity_correction_fit'] = corr_fit
@@ -693,9 +692,6 @@ class CorrectionModel(ConnectivityModel):
 def manual_ci_search(fit, cl, zero_connection=False):
     """Return confidence intervals on the probability of connectivity, given the
     failed execution of the minuit fit.
-
-    Currently this simply calls `statsmodels.stats.proportion.proportion_confint`
-    using the "beta" method.
 
     Parameters
     ----------
