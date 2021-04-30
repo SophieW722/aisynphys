@@ -133,8 +133,8 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
         ConnectivityModel subclass to fit Cp vs distance profile. If combined with
         sigma the fit will be fixed to that sigma. If None, then fit results
         are ommitted from the results
-    correction_model: ConnectivityModel | None
-        ConnectivityModel subclass used to correct fit_model based on other metrics 
+    correction_model: CorrectionModel | None
+        CorrectionModel subclass used to correct fit_model based on other metrics 
         which are set within ConnectivityModel.variables
     dist_measure : str
         Which distance measure to use when calculating connection probability.
@@ -203,24 +203,28 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
             adj_gap_junc, adj_lower_gj_ci, adj_upper_gj_ci = distance_adjusted_connectivity(gap_distances[mask2], gaps[mask2], sigma=sigma, alpha=alpha)
             results[(pre_class, post_class)]['adjusted_gap_junction'] = (adj_gap_junc, adj_lower_gj_ci, adj_upper_gj_ci)
         if correction_model is not None:
+            # TODO: if a different correction_model needs to be supplied for different
+            # cell types, it will be here.
+            
+            # Example implementation
+            # pre_ei = class_pairs[0].pre_cell.cell_class_nonsynaptic
+            # post_ei = class_pairs[0].post_cell.cell_class_nonsynaptic
+            # correction_model = correction_models[pre_ei][post_ei]
+
             # Here it performs corrected p_max fit if there are relevant variables.
             if hasattr(correction_model, 'correction_variables'): # correction model.
                 variables = []
                 for variable in correction_model.correction_variables:
                     var_extract = np.array([getattr(p, variable) for p in probed_pairs], dtype=float)
                     variables.append(var_extract[mask])
-                if len(class_pairs) == 0: # empty list
-                    excinh = 0 # doesn't matter which, so give exc.
-                elif class_pairs[0].pre_cell.cell_class_nonsynaptic == 'ex':
-                    excinh = 0
-                else:
-                    excinh = 1
-
-                corr_fit = correction_model.fit(variables, connections[mask], excinh=excinh)
+                    
+                corr_fit = correction_model.fit(variables, connections[mask])
                 if mask.sum() == 0: # no probing
                     corr_fit.x = np.nan # needed not to report the initial value
                 results[(pre_class, post_class)]['connectivity_correction_fit'] = corr_fit
                 # for gap junctions, this analysis won't be relevant, so I won't assign gap_fit for now.              
+            else:
+                raise ValueError("CorrectionModel needs to have the 'correction_variables' attribute.")
     
     return results
 
@@ -585,7 +589,7 @@ class CorrectionModel(ConnectivityModel):
     correction_functions : list of functions
         Functions used to correct estimating connection probability.
         The following formats need to be valid to execute properly.
-        correction_functions[i](correction_parameters[excinh][i], pair[correction_variables[i]])
+        correction_functions[i](correction_parameters[i], pair[correction_variables[i]])
         where is a Pair instance in pair_group (1st argument of measure_connectivity)
     correction_parameters : list of list of [array or [list of float]]
         Parameters used aside with correction_variables. Fixed during the fit.
@@ -610,7 +614,7 @@ class CorrectionModel(ConnectivityModel):
         for i in range(len(x)):
             # replace None with nan to make the following code to work
             v = np.array([np.nan if el is None else el for el in x[i]])
-            corrval = self.correction_functions[i](self.correction_parameters[self.excinh][i], v)
+            corrval = self.correction_functions[i](self.correction_parameters[i], v)
             correction *= np.nan_to_num(corrval, nan=1.0)
         return np.clip(self.pmax * correction, 0.0, 1.0)
 
@@ -618,8 +622,7 @@ class CorrectionModel(ConnectivityModel):
         self.pmax = pmax  # override existing value
         return -self.likelihood(x, conn)
 
-    def fit(self, x, conn, init=(0.1), bounds=((0.0, 3.0)), excinh=None, **kwds):
-        self.excinh = excinh  # setting the cell class...
+    def fit(self, x, conn, init=(0.1), bounds=((0.0, 3.0)), **kwds):
         fit = iminuit.minimize(
             self.nll,
             x0=init,
@@ -993,6 +996,7 @@ def ei_correct_connectivity(ei_classes, correction_metrics, pairs):
             metric_fit = model.fit(pair_metric[mask], connections[mask], **model_opts)
             correction_fits[class_name].append(metric_fit)
     
+    # TODO: the level of nesting of correction_parameters should be reduced as excinh is removed
     correction_parameters = [[fit.fit_result.x for fit in fits] for fits in correction_fits.values()]
     correction_functions = [metric['model'].correction_func for metric in correction_metrics.values()]
     corr_model = CorrectionModel(0.1, correction_metrics.keys(), correction_functions, correction_parameters)
