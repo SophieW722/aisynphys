@@ -350,8 +350,10 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
             ax[i].set_yscale('log')
         else:
             x_vals = swarm(y_vals)
+            
+        plot = sns.barplot(x='pair_class', y=metric, data=pairs_has_metric, ax=ax[i], ci=None, 
+                           facecolor=(1, 1, 1, 0), edgecolor='black', order=pair_classes, estimator=estimator)
         ax[i].scatter(np.concatenate(x_vals), np.concatenate(y_vals), color=np.concatenate(c2), **plot_args)
-        plot = sns.barplot(x='pair_class', y=metric, data=pairs_has_metric, ax=ax[i], ci=None, facecolor=(1, 1, 1, 0), edgecolor='black', order=pair_classes, estimator=estimator)
         
         if i == len(metrics) - 1:
             ax[i].set_xlabel('pre→post class', size=12)
@@ -359,7 +361,7 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         else:
             ax[i].set_xlabel('')
             ax[i].set_xticklabels('')
-        label = metric_name + ' (%s)'%units
+        label = metric_name + (' (%s)'%units if units else '')
         label = '\n'.join(wrap(label, 20))
         ax[i].set_ylabel(label, size=10)
         ax[i].set_yticklabels([], minor=True)
@@ -410,7 +412,7 @@ def ei_hist_plot(ax, metric, bin_edges, db, pair_query_args):
     ax[0].spines['top'].set_visible(False)
     ax[1].spines['right'].set_visible(False)
     ax[1].spines['top'].set_visible(False)
-    ax[1].set_xlabel('%s (%s)' % (metric_name, units))
+    ax[1].set_xlabel(metric_name + (' (%s)'%units if units else ''))
     ax[1].set_ylabel('Number of Synapses', fontsize=12)
 
     #KS test
@@ -468,7 +470,7 @@ def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, p
                     bg_color=(0.8, 0.8, 0.8),
                     cmap=cmap,
                     norm=norm,
-                    cbarlabel="%s (%s)" % (metric_name, units),
+                    cbarlabel=metric_name + (' (%s)'%units if units else ''),
                     cbar_kw={'shrink':0.5, 'pad':0.02},
                     )
 
@@ -714,7 +716,7 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=Fal
 
     # scatter plots of event amplitudes sorted by pulse number 
     mask = qc_pass_data['induction_frequency'] == ind_f
-    filtered = qc_pass_data[mask]
+    filtered = qc_pass_data[mask].copy()
 
     sign = 1 if pair.synapse.synapse_type == 'ex' else -1
     try:
@@ -727,7 +729,9 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=Fal
     scatter_opts = {'color': (0.7, 0.7, 0.7, ), 'size': 3}
     scatter_opts.update(scatter_args)
     sns.swarmplot(x='pulse_number', y='dec_fit_reconv_amp', data=filtered, ax=ax, **scatter_opts)
-    ax.get_legend().remove()
+    leg = ax.get_legend()
+    if leg is not None:
+        leg.remove()
     
 
     line_opts = {'color': 'k', 'linewidth': 2, 'zorder': 100}
