@@ -195,7 +195,7 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                 elif corrections_applied:
                     cp, cp_lower_ci, cp_upper_ci = result['connectivity_correction_fit'].cp_ci
                     if correction_only:
-                        cp = cp / result['adjusted_connectivity'][0]
+                        cp = cp / result['connection_probability'][0] if result['connection_probability'][0] != 0 else np.nan
                         cp_lower_ci = cp # disabling the ci
                         cp_upper_ci = cp
                 else:

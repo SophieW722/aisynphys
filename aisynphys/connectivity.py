@@ -635,7 +635,7 @@ class CorrectionModel(ConnectivityModel):
             fit.cp_ci = (np.nan, np.nan, np.nan)
             return fit
 
-        cp = fit.x
+        cp = fit.x[0]
         import pdb
 
         if self.do_minos:  # MINOS (Likelihood-based CI estimation)
