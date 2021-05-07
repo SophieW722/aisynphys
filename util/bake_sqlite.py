@@ -33,9 +33,9 @@ skip_columns = {}
 skip_columns['full'] = {}
 skip_columns['medium'] = skip_columns['full'].copy()
 skip_columns['medium'].update({
-    'pulse_response': ['data'],
-    'baseline': ['data'],
-    'stim_pulse': ['data'],
+    'pulse_response': ['data', 'meta'],
+    'baseline': ['data', 'meta'],
+    'stim_pulse': ['data', 'meta'],
 })
 skip_columns['small'] = skip_columns['medium'].copy()
 
