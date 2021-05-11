@@ -1042,7 +1042,7 @@ def get_correction_model(probed_pairs, correction_metrics, pmax=0.1):
         pair_metric = np.array([getattr(p, metric) for p in probed_pairs], dtype=float)    
         mask = np.isfinite(pair_metric) & np.isfinite(connections)
         model = opts['model']
-        model_opts = {k:v for k, v in opts.items() if k != 'model'}
+        model_opts = opts['model_opts']
 
         metric_fit = model.fit(pair_metric[mask], connections[mask], **model_opts)
         metric_corr_model = CorrectionModel(pmax, [metric], [model.correction_func], [metric_fit.fit_result.x])
