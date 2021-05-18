@@ -973,32 +973,85 @@ class CorrectionMetricFunctions:
         else:
             return np.nan
 
+def get_cp_results(pairs, alpha=0.5):
+    probed_pairs = [p for p in pairs if pair_was_probed(p, p.pre_cell.cell_class_nonsynaptic)]
+    connections_found = [p for p in probed_pairs if p.has_synapse]
 
-def ei_correct_connectivity(ei_classes, correction_metrics, pairs):
+    gaps_probed = [p for p in pairs if pair_probed_gj(p)]
+    gaps_found = [p for p in gaps_probed if p.has_electrical]
+
+    n_connected = len(connections_found)
+    n_probed = len(probed_pairs)
+    n_gaps_probed = len(gaps_probed)
+    n_gaps = len(gaps_found)
+    conf_interval_cp = connection_probability_ci(n_connected, n_probed, alpha=alpha)
+    conn_prob = float('nan') if n_probed == 0 else n_connected / n_probed
+    conf_interval_gap = connection_probability_ci(n_gaps, n_gaps_probed, alpha=alpha)
+    gap_prob = float('nan') if n_gaps_probed == 0 else n_gaps / n_gaps_probed
+
+    results = {
+        'n_probed': n_probed,
+        'n_connected': n_connected,
+        'n_gaps_probed': n_gaps_probed,
+        'n_gaps': n_gaps,
+        'connection_probability': (conn_prob,) + conf_interval_cp,
+        'gap_probability': (gap_prob,) + conf_interval_gap,
+        'connected_pairs': connections_found,
+        'gap_pairs': gaps_found,
+        'probed_pairs': probed_pairs,
+    }
+        
+    return results
+
+def fit_cp(probed_pairs, fit_metric='lateral_distance', fit_model=GaussianModel, fit_opts={}):
+    metric = np.array([getattr(p, fit_metric) for p in probed_pairs], dtype=float)
+    connections = np.array([p.synapse for p in probed_pairs], dtype=bool)
+    mask = np.isfinite(metric) & np.isfinite(connections)
+    fit = fit_model.fit(metric[mask], connections[mask], **fit_opts)
+    
+    return fit
+
+def adjust_cp(probed_pairs, correction_model):
+    
+    assert hasattr(correction_model, 'correction_variables'), "CorrectionModel needs to have the 'correction_variables' attribute."
+    
+    connections = np.array([p.synapse for p in probed_pairs], dtype=bool)
+    mask = np.isfinite(connections)
+    variables = []
+    for variable in correction_model.correction_variables:
+        var_extract = np.array([getattr(p, variable) for p in probed_pairs], dtype=float)
+        # mask = mask & np.isfinite(var_extract)
+        variables.append(var_extract)
+    
+    corr_fit = correction_model.fit([v[mask] for v in variables], connections[mask])
+    if mask.sum() == 0: # no probing
+        corr_fit.x = np.nan # needed not to report the initial value
+    
+    return corr_fit
+
+def get_correction_model(probed_pairs, correction_metrics, pmax=0.1):
     # correction_metrics is a dictionary where the key is the name of the metric which corresponds to either a column in the 
     # SynPhys DB or is a callable function and the values are a dictionary identifying the fit model and any associated parameters
-    
-    correction_fits = {}
-    for class_name, cell_class in ei_classes.items():
 
-        class_pairs = [p for p in pairs if p.pre_cell.cell_class_nonsynaptic==cell_class.name]
+    connections = np.array([p.has_synapse for p in probed_pairs], dtype=bool)
+    corr_model = {}
+    correction_fits = []
+    correction_parameters = []
+    correction_functions = []
+    for metric, opts in correction_metrics.items():
+        pair_metric = np.array([getattr(p, metric) for p in probed_pairs], dtype=float)    
+        mask = np.isfinite(pair_metric) & np.isfinite(connections)
+        model = opts['model']
+        model_opts = opts['model_opts']
 
-        probed_pairs = [p for p in class_pairs if pair_was_probed(p, cell_class.output_synapse_type)]
-        connections = np.array([p.has_synapse for p in probed_pairs], dtype=bool)
+        metric_fit = model.fit(pair_metric[mask], connections[mask], **model_opts)
+        metric_corr_model = CorrectionModel(pmax, [metric], [model.correction_func], [metric_fit.fit_result.x])
+        corr_model[metric] = metric_corr_model
+        
+        correction_fits.append(metric_fit)
+        correction_parameters.append(metric_fit.fit_result.x)
+        correction_functions.append(model.correction_func)
 
-        correction_fits[class_name] = []
-        for metric, opts in correction_metrics.items():
-            pair_metric = np.array([getattr(p, metric) for p in probed_pairs], dtype=float)    
-            mask = np.isfinite(pair_metric) & np.isfinite(connections)
-            model = opts['model']
-            model_opts = {k:v for k, v in opts.items() if k != 'model'}
-
-            metric_fit = model.fit(pair_metric[mask], connections[mask], **model_opts)
-            correction_fits[class_name].append(metric_fit)
-    
-    # TODO: the level of nesting of correction_parameters should be reduced as excinh is removed
-    correction_parameters = [[fit.fit_result.x for fit in fits] for fits in correction_fits.values()]
-    correction_functions = [metric['model'].correction_func for metric in correction_metrics.values()]
-    corr_model = CorrectionModel(0.1, correction_metrics.keys(), correction_functions, correction_parameters)
+    corr_model['full_model'] = CorrectionModel(pmax, correction_metrics.keys(), correction_functions, correction_parameters)
     
     return corr_model
