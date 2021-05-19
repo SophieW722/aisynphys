@@ -223,7 +223,7 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                 cprob_str[i,j] = "" if result['n_gaps_probed'] == 0 else "%d/%d" % (found, result['n_gaps_probed'])
 
             
-            cprob_alpha[i,j] = 1.0 - 1.0 * max(cp_upper_ci - cp, cp - cp_lower_ci)
+            cprob_alpha[i,j] = 1.0 - 1.5 * max(cp_upper_ci - cp, cp - cp_lower_ci)
 
 
     # map connection probability to RGB colors
