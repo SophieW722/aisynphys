@@ -22,6 +22,17 @@ PairNotes = make_table(
     ormbase=DataNotesORMBase,
 )
 
+PatchseqHistory = make_table(
+    name='patchseq_history',
+    comment='Cumulative history of transcriptomic mapping for each multi-patchseq tube',
+    columns=[
+        ('tube_id', 'str', 'patchseq tube id', {'index': True}),
+        ('notes', 'object', 'dict containing mapping date and results of mapping'),
+        ('modification_time', 'datetime', 'Last modification time for each record'),
+    ],
+    ormbase=DataNotesORMBase,
+)
+
 if config.synphys_db_host is None:
     db = NoDatabase("Cannot access data_notes; no DB specified in config.synphys_db_host")
 else:
@@ -42,4 +53,18 @@ def get_pair_notes_record(expt_id, pre_cell_id, post_cell_id, session=None):
         return None
     elif len(recs) > 1:
         raise Exception("Multiple records found in pair_notes for pair %s %s %s!" % (expt_id, pre_cell_id, post_cell_id))
+    return recs[0]
+
+def get_tube_history_record(tube_id, session=None):
+    if session is None:
+        session = db.default_session
+
+    q = session.query(PatchseqHistory)
+    q = q.filter(PatchseqHistory.tube_id==tube_id)
+
+    recs = q.all()
+    if len(recs) == 0:
+        return None
+    elif len(recs) > 1:
+        raise Exception('Multiple records found in patchseq_history for tube %s!' % tube_id)
     return recs[0]
