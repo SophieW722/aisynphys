@@ -897,6 +897,12 @@ class CorrectionMetricFunctions:
             return np.nan
 
 
+def get_cp_results():
+    # reminder stub: when merging full_submission branch, take care of 
+    # remaining issues in https://github.com/AllenInstitute/aisynphys/pull/121
+    pass
+
+
 def ei_correct_connectivity(ei_classes, correction_metrics, pairs):
     # correction_metrics is a dictionary where the key is the name of the metric which corresponds to either a column in the 
     # SynPhys DB or is a callable function and the values are a dictionary identifying the fit model and any associated parameters

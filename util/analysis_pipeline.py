@@ -11,7 +11,7 @@ if __name__ == '__main__':
     logging.getLogger('aisynphys').setLevel(logging.INFO)
     all_pipelines = all_pipelines()
     
-    parser = argparse.ArgumentParser(description="Process analysis pipeline jobs")
+    parser = argparse.ArgumentParser(description="Process analysis pipeline jobs", parents=[config.parser])
     parser.add_argument('pipeline', type=str, help="The name of the pipeline to run: %s" % ', '.join(list(all_pipelines.keys())))
     parser.add_argument('modules', type=str, nargs='*', help="The name of the analysis module(s) to run")
     parser.add_argument('--update', action='store_true', default=False, help="Process any jobs that are ready to be updated")

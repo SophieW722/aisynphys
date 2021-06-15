@@ -6,7 +6,8 @@ from aisynphys.database import default_db as db
 from aisynphys.config import synphys_db
 from aisynphys import config
 
-parser = argparse.ArgumentParser()
+
+parser = argparse.ArgumentParser(parents=[config.parser])
 parser.add_argument('--reset-db', action='store_true', default=False, help="Drop all tables in the database.", dest='reset_db')
 parser.add_argument('--vacuum', action='store_true', default=False, help="Ask the database to clean/optimize itself.")
 parser.add_argument('--bake', type=str, default=None, help="Bake current database into an sqlite file.")

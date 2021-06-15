@@ -11,8 +11,8 @@ from collections import OrderedDict
 from ... import config
 from .pipeline_module import MultipatchPipelineModule
 from .experiment import ExperimentPipelineModule
-from acq4.util.DataManager import getHandle
 from ...util import optional_import
+getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 pyodbc = optional_import('pyodbc')
 
 
@@ -50,6 +50,7 @@ mapping_cols = {
             'marker_sum_norm_label': 'norm_marker_sum',
             'last_map': 'last_map',
             'last_score': 'last_score',
+            'batch_vendor_name': 'batch',
             }
 
 col_names = amp_cols.copy()
@@ -77,7 +78,7 @@ class PatchSeqPipelineModule(MultipatchPipelineModule):
         cell_species = get_cell_species(db)
 
         path = os.path.join(config.synphys_data, expt.storage_path)
-        site_info = getHandle(path).info()
+        site_info = getDirHandle(path).info()
         headstages = site_info.get('headstages')
         if headstages is not None:
             patchseq_tubes = {hs_name.split('HS')[1]: hs['Tube ID'] for hs_name, hs in headstages.items()}
@@ -170,7 +171,7 @@ class PatchSeqPipelineModule(MultipatchPipelineModule):
             ready[expt_id] = {'dep_time': expt_mtime}
 
             path = os.path.join(config.synphys_data, expt.storage_path)
-            site_info = getHandle(path).info()
+            site_info = getDirHandle(path).info()
             headstages = site_info.get('headstages')
             if headstages is None:
                 continue

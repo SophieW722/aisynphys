@@ -245,20 +245,20 @@ def fit_avg_pulse_response(pulse_response_list, latency_window, sign, init_param
         The averaged pulse response data
     
     """
-    prof = Profiler(disabled=True, delayed=False)
+    # prof = Profiler(disabled=True, delayed=False)
     pair = pulse_response_list[0].pair
     clamp_mode = pulse_response_list[0].recording.patch_clamp_recording.clamp_mode
 
     # make a list of spike-aligned postsynaptic tseries
     tsl = PulseResponseList(pulse_response_list).post_tseries(align='spike', bsub=True)
-    prof('make tseries list')
+    # prof('make tseries list')
     
     if len(tsl) == 0:
         return None, None
     
     # average all together
     average = tsl.mean()
-    prof('average')
+    # prof('average')
         
     # start with even weighting
     weight = np.ones(len(average))
@@ -274,9 +274,9 @@ def fit_avg_pulse_response(pulse_response_list, latency_window, sign, init_param
     if abs(pre_id - post_id) < 3:
         # nearby electrodes; mask out crosstalk
         pass
-    prof('weights')
+    # prof('weights')
 
     fit = fit_psp(average, search_window=latency_window, clamp_mode=clamp_mode, sign=sign, baseline_like_psp=True, init_params=init_params, fit_kws={'weights': weight})
-    prof('fit')
+    # prof('fit')
     
     return fit, average
