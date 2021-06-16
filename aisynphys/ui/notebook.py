@@ -4,6 +4,7 @@ import io
 import numpy as np
 import matplotlib
 import matplotlib.cm
+import matplotlib.lines
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -836,3 +837,25 @@ def compose_svg_figure(figure_spec, filename, size, display=False):
         from IPython.display import SVG, display
         display(SVG(filename=filename))
 
+
+def make_scatter_legend(ax, values, cmap, norm, label_formatter, title, 
+                        color=None, markersize=10, linewidth=0, markeredgewidth=0,
+                        loc='upper left', bbox_to_anchor=(1, 1), marker='o',
+                        **kwds):
+    if isinstance(cmap, str):
+        cmap = matplotlib.cm.get_cmap(cmap)
+
+    legend_elements = []
+    for x in values:
+        legend_elements.append(matplotlib.lines.Line2D(
+            [0], [0], marker=marker, color=color, linewidth=linewidth, markeredgewidth=markeredgewidth,
+            label=label_formatter(x), markerfacecolor=cmap(norm(x)), markersize=markersize,
+        ))
+
+    return ax.legend(
+        handles=legend_elements, 
+        loc=loc, 
+        title=title,
+        bbox_to_anchor=bbox_to_anchor,
+        **kwds
+    )

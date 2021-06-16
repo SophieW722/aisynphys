@@ -14,6 +14,9 @@ def connectivity_profile(connected, distance, bin_edges):
     """
     Compute connection probability vs distance with confidence intervals.
 
+    Connections are binned by distance and the connected proportion in each bin is returned along with
+    the binomial confidence intervals. 
+
     Parameters
     ----------
     connected : boolean array
@@ -922,6 +925,7 @@ def recip_connectivity_profile(probes_1, probes_2, bin_edges):
 
 
 class CorrectionMetricFunctions:
+    @staticmethod
     def pre_axon_length(pair):
         cell_morph = pair.pre_cell.morphology
         if cell_morph is None:
@@ -931,6 +935,7 @@ class CorrectionMetricFunctions:
         elif cell_morph.axon_truncation == 'intact':
             return 200e-6
 
+    @staticmethod
     def avg_pair_depth(pair):
         if pair.pre_cell.depth is None or pair.post_cell.depth is None:
             return np.nan
@@ -939,6 +944,7 @@ class CorrectionMetricFunctions:
             return np.nan
         return avg_depth
 
+    @staticmethod
     def n_test_spikes(pair):
         syn_type = pair.pre_cell.cell_class_nonsynaptic
         if syn_type not in ['ex', 'in']:
@@ -949,6 +955,7 @@ class CorrectionMetricFunctions:
         n_spikes = n_spikes if n_spikes <= 800 else 800
         return n_spikes            
 
+    @staticmethod
     def baseline_rms_noise(pair):
         post_cell = pair.post_cell
         q = db.query(db.PatchClampRecording)
@@ -961,6 +968,7 @@ class CorrectionMetricFunctions:
         else:
             return np.nan
 
+    @staticmethod
     def detection_power(pair):
         n_spikes = CorrectionMetricFunctions.n_test_spikes(pair)
         baseline_noise = CorrectionMetricFunctions.baseline_rms_noise(pair)
