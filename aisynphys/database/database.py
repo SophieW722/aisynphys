@@ -5,14 +5,14 @@ The actual schemas for database tables are implemented in other files in this su
 """
 from __future__ import division, print_function
 
-import os, sys, io, time, json, threading, gc, re, weakref
-from datetime import datetime
+import os, sys, io, json, threading, gc, re, weakref
 from collections import OrderedDict
 import numpy as np
 try:
     import queue
 except ImportError:
     import Queue as queue
+from inspect import isclass
 
 import sqlalchemy
 from distutils.version import LooseVersion
@@ -22,13 +22,14 @@ if LooseVersion(sqlalchemy.__version__) < '1.2':
 import sqlalchemy.inspection
 from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Boolean, Float, Date, DateTime, LargeBinary, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, deferred, sessionmaker, reconstructor
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.sql.expression import func
 
 
 from .. import config
+from neuroanalysis.util.optional_import import optional_import
+pandas = optional_import('pandas')
 
 
 class NDArray(TypeDecorator):
@@ -50,6 +51,10 @@ class NDArray(TypeDecorator):
         buf = io.BytesIO(value)
         return np.load(buf, allow_pickle=False)
 
+    @property
+    def python_type(self):
+        return np.ndarray
+
 
 class JSONObject(TypeDecorator):
     """For marshalling objects in/out of json-encoded text.
@@ -65,6 +70,10 @@ class JSONObject(TypeDecorator):
             return None
         return json.loads(value)
 
+    @property
+    def python_type(self):
+        object
+
 
 class FloatType(TypeDecorator):
     """For marshalling float types (including numpy).
@@ -75,7 +84,11 @@ class FloatType(TypeDecorator):
         if value is None:
             return None
         return float(value)
-        
+
+    @property
+    def python_type(self):
+        return float
+
     #def process_result_value(self, value, dialect):
         #buf = io.BytesIO(value)
         #return np.load(buf, allow_pickle=False)
@@ -644,12 +657,85 @@ class Database(object):
 
 
 class DBQuery(sqlalchemy.orm.Query):
-    def dataframe(self):
+    def dataframe(self, expand_tables=False):
         """Return a pandas dataframe constructed from the results of this query.
+
+        Parameters
+        ----------
+        expand_tables : bool | list
+            If True, expand all table entities included in the query into individual
+            columns. Optionally, a list of table names to expand may be provided instead.
         """
-        import pandas
-        return pandas.read_sql(self.statement, self.session.bind)
-        
+        # don't like this; we want a bit more control over how columns are unpacked / renamed
+        # return pandas.read_sql(self.statement, self.session.bind)
+        arr = self.recarray(expand_tables=expand_tables)
+        return pandas.DataFrame(arr)
+
+    def recarray(self, expand_tables=False):
+        """Return a numpy record array constructed from the results of this query.
+
+        Parameters
+        ----------
+        expand_tables : bool | list
+            If True, expand all table entities included in the query into individual
+            columns. Optionally, a list of table names to expand may be provided instead.
+        """
+        # decide on column names and dtypes to use
+        cols = self.column_descriptions
+        col_names = []
+        col_types = []
+        rec_fields = []
+        for col in cols:
+            if isinstance(col['type'], sqlalchemy.ext.declarative.api.DeclarativeMeta):
+                # this column holds an entire table; use table name unless aliased
+                cname = col['name'] if col['aliased'] else col['entity'].__table__.name
+                col_names.append(cname)
+                col_types.append('object')
+                rec_fields.append(col['name'])
+            else:
+                rec_fields.append(col['name'])
+
+                expr = col['expr']
+                if isinstance(expr, sqlalchemy.sql.elements.Label):
+                    # query specifies a label here; use that name unconditionally
+                    col_names.append(expr.name)
+                else:
+                    # assign column names as table.column
+                    if isinstance(expr, sqlalchemy.orm.attributes.InstrumentedAttribute):
+                        table_name = sqlalchemy.inspect(col['entity']).name if col['aliased'] else col['entity'].__table__.name
+                        col_names.append(table_name + '.' + col['name'])
+                    elif isinstance(expr, sqlalchemy.sql.annotation.AnnotatedColumn):
+                        col_names.append(expr.table.name + '.' + expr.name)
+                    elif isinstance(expr, sqlalchemy.sql.elements.BinaryExpression):
+                        col_names.append(str(col['expr']) if col['name'] is None else col['name'])
+                    else:
+                        raise TypeError(f"recarray() does not support column of type {repr(expr)} (name: {col['name']})")
+
+                try:
+                    if col['type'].python_type in (int, float):
+                        # use int for primary / foreign keys; float for all other (to allow NaN)
+                        col_is_key = (
+                            isinstance(col['expr'], sqlalchemy.orm.attributes.InstrumentedAttribute)
+                            and len(col['expr'].prop.columns) == 1
+                            and (
+                                col['expr'].prop.columns[0].primary_key
+                                or len(col['expr'].prop.columns[0].foreign_keys) > 0
+                            )
+                        )
+                        col_types.append('int' if col_is_key else 'float')
+                    else:
+                        col_types.append('object')
+                except Exception:
+                    col_types.append('object')
+
+        dtype = list(zip(col_names, col_types))
+
+        # convert records to numpy array
+        recs = self.all()
+        arr = np.array(recs, dtype=dtype)
+
+        return arr
+
 
 class TableReadThread(threading.Thread):
     """Iterator that yields records (all columns) from a table.
