@@ -201,12 +201,11 @@ class SynphysDatabase(Database):
         post_patch_seq = aliased(self.PatchSeq, name='post_patch_seq')
         pre_intrinsic = aliased(self.Intrinsic, name='pre_intrinsic')
         post_intrinsic = aliased(self.Intrinsic, name='post_intrinsic')
-        pre_location = aliased(self.CorticalCellLocation, name='pre_location')
-        post_location = aliased(self.CorticalCellLocation, name='post_location')
-        query = session.query(
-            self.Pair,
-        )
-        query = (query
+        pre_location = aliased(self.CorticalCellLocation, name='pre_cortical_cell_location')
+        post_location = aliased(self.CorticalCellLocation, name='post_cortical_cell_location')
+
+        query = (
+            session.query(self.Pair)
             .join(pre_cell, pre_cell.id==self.Pair.pre_cell_id)
             .join(post_cell, post_cell.id==self.Pair.post_cell_id)
             .outerjoin(pre_morphology, pre_morphology.cell_id==pre_cell.id)
@@ -285,7 +284,8 @@ class SynphysDatabase(Database):
                 query = query.filter(expr)
                 
         if 'cell' in preload:
-            query = (query
+            query = (
+                query
                 .add_entity(pre_cell)
                 .add_entity(post_cell)
                 .add_entity(pre_morphology)
@@ -311,12 +311,16 @@ class SynphysDatabase(Database):
             )
 
         if 'synapse' in preload:
-            query = query.add_entity(self.Synapse)
+            query = (
+                query
+                .add_entity(self.Synapse)
+                .add_entity(self.RestingStateFit)
+                .add_entity(self.Dynamics)
+            )
             query = query.options(
                 contains_eager(self.Pair.synapse),
-                selectinload(self.Pair.resting_state_fit), 
-                selectinload(self.Pair.dynamics), 
-                selectinload(self.Pair.synapse_prediction), 
+                contains_eager(self.Synapse.resting_state_fit),
+                contains_eager(self.Pair.dynamics),
             )
 
         # package the aliased cells

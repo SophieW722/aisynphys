@@ -25,7 +25,7 @@ def test_recarray():
     q = mk_test_query()
 
     # First test query without tables expanded
-    arr = q.recarray()
+    arr = q.recarray(expand_tables=False)
 
     assert arr.shape == (10,)
     fields = dict(arr.dtype.fields)
@@ -43,14 +43,14 @@ def test_recarray():
         'negative temp',
     ]
 
-    assert fields['experiment.id'][0].kind == 'i'
+    assert fields['experiment.id'][0].kind == 'O'
     assert fields['experiment.project_name'][0].kind == 'O'
     assert fields['temp'][0].kind == 'f'
     assert fields['slice'][0].kind == 'O'
     assert fields['aliased_slice'][0].kind == 'O'
-    assert fields['slice.id'][0].kind == 'i'
-    assert fields['aliased_slice.id'][0].kind == 'i'
-    assert fields['experiment.slice_id'][0].kind == 'i'
+    assert fields['slice.id'][0].kind == 'O'
+    assert fields['aliased_slice.id'][0].kind == 'O'
+    assert fields['experiment.slice_id'][0].kind == 'O'
     assert fields['slice.id + experiment.target_temperature'][0].kind == 'f'
     assert fields['sum_of_fields'][0].kind == 'f'
     assert fields['negative temp'][0].kind == 'f'
@@ -83,6 +83,9 @@ def test_recarray():
     attr_names = get_table_nondeferred_columns(db.PulseResponse, prefix='pulse_response.')
     assert set(arr.dtype.names) == set(attr_names)
 
+    # test a more difficult query
+    arr = db.pair_query(synapse=True, preload=['cell']).limit(20).recarray()
+
 
 def get_table_nondeferred_columns(table, prefix=''):
     meta = sqlalchemy.inspect(table)
@@ -91,7 +94,7 @@ def get_table_nondeferred_columns(table, prefix=''):
 
 def test_dataframe():
     q = mk_test_query()
-    df = q.dataframe()
+    df = q.dataframe(expand_tables=False)
 
     assert list(df.columns) == [
         'experiment.id',
