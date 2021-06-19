@@ -253,7 +253,9 @@ def connection_probability_ci(n_connected, n_probed, alpha=0.05):
     return proportion_confint(n_connected, n_probed, alpha=alpha, method='beta')
 
 
-def pair_was_probed(pair, synapse_type):
+probed_pair_test_spike_limit = 10
+
+def pair_was_probed(pair, synapse_type, test_spike_limit=None):
     """Return boolean indicating whether a cell pair was "probed" for either 
     excitatory or inhibitory connectivity.
     
@@ -264,14 +266,20 @@ def pair_was_probed(pair, synapse_type):
     
     Parameters
     ----------
+    pair : Pair
+        The cell pair to check
     synapse_type : str
-        Must be either 'ex', 'in', or None. If None, then the pair is considered probed
+        Must be 'ex', 'in', 'mixed', or None. If None or 'mixed', then the pair is considered probed
         if it passes criteria for _both_ 'ex' and 'in'.
+    test_spike_limit : int | None
+        The number of test spikes required to consider a pair probed for connectivity.
     """
-    test_spike_limit = 10
+    global probed_pair_test_spike_limit
+    if test_spike_limit is None:
+        test_spike_limit = probed_pair_test_spike_limit
 
-    assert synapse_type in ('ex', 'in', None), "synapse_type must be 'ex', 'in', or None"
-    if synapse_type is None:
+    assert synapse_type in ('ex', 'in', 'mixed', None), "synapse_type must be 'ex', 'in', 'mixed', or None"
+    if synapse_type in (None, 'mixed'):
         return (pair.n_ex_test_spikes > test_spike_limit) and (pair.n_in_test_spikes > test_spike_limit)
     else:
         qc_field = 'n_%s_test_spikes' % synapse_type
