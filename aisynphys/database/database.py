@@ -713,7 +713,6 @@ class DBQuery(sqlalchemy.orm.Query):
 
         return pandas.concat(data, axis=1)
 
-
     def recarray(self, expand_tables=True):
         """Return a numpy record array constructed from the results of this query.
 

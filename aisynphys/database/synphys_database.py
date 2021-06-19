@@ -152,8 +152,8 @@ class SynphysDatabase(Database):
             self._project_names = [rec[0] for rec in session.query(self.Experiment.project_name).distinct().all()]
         return self._project_names
 
-    def pair_query(self, pre_class=None, post_class=None, synapse=None, synapse_type=None, electrical=None, 
-                   project_name=None, acsf=None, age=None, species=None, distance=None, internal=None, 
+    def pair_query(self, pre_class=None, post_class=None, synapse=None, synapse_type=None, synapse_probed=None, electrical=None,
+                   experiment_type=None, project_name=None, acsf=None, age=None, species=None, distance=None, internal=None,
                    preload=(), session=None, filter_exprs=None):
         """Generate a query for selecting pairs from the database.
 
@@ -167,8 +167,13 @@ class SynphysDatabase(Database):
             Include only pairs that are (or are not) connected by a chemical synapse
         synapse_type : str | None
             Include only synapses of a particular type ('ex' or 'in')
+        synapse_probed : bool | None
+            If True, include only pairs that were probed for a synaptic connection (regardless
+            of whether a connectin was found)
         electrical : bool | None
             Include only pairs that are (or are not) connected by an electrical synapse (gap junction)
+        experiment_type : str | None
+            Include only data from specific types of experiments
         project_name : str | list | None
             Value(s) to match from experiment.project_name (e.g. "mouse V1 coarse matrix" or "human coarse matrix")
         acsf : str | list | None
@@ -186,12 +191,19 @@ class SynphysDatabase(Database):
             List of strings specifying resources to preload along with the queried pairs. 
             This can speed up performance in cases where these would otherwise be 
             individually queried later on. Options are:
+            - "experiment" (includes experiment and slice)
             - "cell" (includes cell, morphology, cortical_location, and patch_seq)
-            - "synapse" (includes synapse, resting_statem dynamics, and synapse_prediction)
+            - "synapse" (includes synapse, resting_state, dynamics, and synapse_model)
+            - "synapse_prediction" (includes only synapse_prediction)
         filter_exprs : list | None
             List of sqlalchemy expressions, each of which will restrict the query
             via a call to query.filter(expr)
         """
+
+        if experiment_type == 'standard multipatch':
+            assert project_name is None, "cannot specify both experiment_type and project_name"
+            project_name = ['mouse V1 coarse matrix', 'mouse V1 pre-production', 'human coarse matrix']
+
         session = session or self.default_session
         pre_cell = aliased(self.Cell, name='pre_cell')
         post_cell = aliased(self.Cell, name='post_cell')
@@ -222,6 +234,7 @@ class SynphysDatabase(Database):
             .outerjoin(self.SynapsePrediction, self.SynapsePrediction.pair_id==self.Pair.id)
             .outerjoin(self.Dynamics, self.Dynamics.pair_id==self.Pair.id)
             .outerjoin(self.RestingStateFit, self.RestingStateFit.synapse_id==self.Synapse.id)
+            .outerjoin(self.SynapseModel, self.SynapseModel.pair_id==self.Pair.id)
             # .outerjoin(self.PolySynapse)
             # .outerjoin(self.GapJunction)
         )
@@ -238,6 +251,14 @@ class SynphysDatabase(Database):
         if synapse_type is not None:
             assert synapse_type in ['ex', 'in', 'mixed'], "synapse_type must be 'ex', 'in', or 'mixed'"
             query = query.filter(self.Synapse.synapse_type==synapse_type)
+
+        if synapse_probed is True:
+            from ..connectivity import probed_pair_test_spike_limit
+            query = query.filter(
+                ((pre_cell.cell_class == 'ex') & (self.Pair.n_ex_test_spikes > probed_pair_test_spike_limit)) |
+                ((pre_cell.cell_class == 'in') & (self.Pair.n_in_test_spikes > probed_pair_test_spike_limit)) |
+                ((self.Pair.n_ex_test_spikes > probed_pair_test_spike_limit) & (self.Pair.n_in_test_spikes > probed_pair_test_spike_limit))
+            )
 
         if electrical is not None:
             query = query.filter(self.Pair.has_electrical==electrical)
@@ -282,7 +303,18 @@ class SynphysDatabase(Database):
         if filter_exprs is not None:
             for expr in filter_exprs:
                 query = query.filter(expr)
-                
+
+        if 'experiment' in preload:
+            query = (
+                query
+                .add_entity(self.Experiment)
+                .add_entity(self.Slice)
+            )
+            query = query.options(
+                contains_eager(self.Pair.experiment),
+                contains_eager(self.Experiment.slice),
+            )
+
         if 'cell' in preload:
             query = (
                 query
@@ -316,11 +348,22 @@ class SynphysDatabase(Database):
                 .add_entity(self.Synapse)
                 .add_entity(self.RestingStateFit)
                 .add_entity(self.Dynamics)
+                .add_entity(self.SynapseModel)
             )
             query = query.options(
                 contains_eager(self.Pair.synapse),
                 contains_eager(self.Synapse.resting_state_fit),
                 contains_eager(self.Pair.dynamics),
+                contains_eager(self.Pair.synapse_model),
+            )
+
+        if 'synapse_prediction' in preload:
+            query = (
+                query
+                .add_entity(self.SynapsePrediction)
+            )
+            query = query.options(
+                contains_eager(self.Pair.synapse_prediction),
             )
 
         # package the aliased cells
