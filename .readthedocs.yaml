@@ -1,0 +1,18 @@
+# .readthedocs.yaml
+# Read the Docs configuration file
+# See https://docs.readthedocs.io/en/stable/config-file/v2.html for details
+
+version: 2
+
+python:
+  version: 3
+  install:
+    - method: pip
+      path: .
+
+conda:
+  environment: rtd-environment.yml
+
+sphinx:
+   configuration: doc/source/conf.py
+
