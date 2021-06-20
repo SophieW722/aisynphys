@@ -148,6 +148,4 @@ class EnumStyleItem(ptree.types.SimpleParameter):
             symbol_size[mask] = child['Symbol size']
             symbol_pen[mask] = fn.mkPen(child['Symbol pen', 'Color'], width=child['Symbol pen', 'Width'])
 
-        style = dict(pen=None, symbol=symbols, symbolSize=symbol_size, symbolPen=symbol_pen)
-        sdfg
-        return style 
+        return dict(pen=None, symbol=symbols, symbolSize=symbol_size, symbolPen=symbol_pen)
