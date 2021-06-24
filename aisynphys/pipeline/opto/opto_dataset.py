@@ -54,13 +54,20 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
         elecs_by_ad_channel = {elec.device_id:elec for elec in expt_entry.electrodes}
         cell_entries = expt_entry.cells ## do this once here instead of multiple times later because it's slooooowwwww
         pairs_by_cell_id = expt_entry.pairs
+        cells_by_stim_point_id = {cell.meta.get('stim_point_ext_id'):cell for cell in cell_entries.values() if cell.meta.get('stim_point_ext_id') is not None}
+
+        ## reset counts of test spikes
+        for pair in pairs_by_cell_id.values():
+            pair.n_ex_test_spikes = 0
+            pair.n_in_test_spikes = 0
 
         # load NWB file
         path = os.path.join(config.synphys_data, expt_entry.storage_path)
         expt = AI_Experiment(loader=OptoExperimentLoader(site_path=path))
         nwb = expt.data
         stim_log = expt.loader.load_stimulation_log()
-        if stim_log['version'] < 3:
+        stim_log_version = stim_log.get('version', 0)
+        if stim_log_version < 3:
             ## gonna need to load an image in order to calculate spiral size later
             from acq4.util.DataManager import getHandle
 
@@ -82,7 +89,7 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                     sync_rec=srec_entry,
                     electrode=electrode_entry,
                     start_time=rec.start_time,
-                    device_name=str(rec.device_id)
+                    device_name=str(rec.device_id),
                     stim_name=(None if rec.stimulus is None else rec.stimulus.description),
                     stim_meta=(None if rec.stimulus is None else rec.stimulus.save()),
                 )
@@ -123,36 +130,62 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                         session.add(tp_entry)
                         pcrec_entry.nearest_test_pulse = tp_entry
 
-                    psa = PatchClampStimPulseAnalyzer.get(rec)
-                    pulses = psa.pulse_chunks()
-                    pulse_entries = {}
-                    all_pulse_entries[rec.device_id] = pulse_entries
-                    cell_entry = electrode_entry.cell
+                    stim_name = rec.stimulus.description.lower()
+                    if any(substr in stim_name for substr in ['pulsetrain', 'recovery', 'pulstrn']):
 
-                    for i,pulse in enumerate(pulses):
-                        # Record information about all pulses, including test pulse.
-                        t0, t1 = pulse.meta['pulse_edges']
-                        resampled = pulse['primary'].resample(sample_rate=20000)
-                        
-                        clock_time = t0 + datetime_to_timestamp(rec_entry.start_time)
-                        prev_pulse_dt = clock_time - last_stim_pulse_time.get(cell_entry.ext_id, -np.inf)
-                        last_stim_pulse_time[cell_entry.ext_id] = clock_time
+                        psa = PatchClampStimPulseAnalyzer.get(rec)
+                        pulses = psa.pulse_chunks()
+                        pulse_entries = {}
+                        all_pulse_entries[rec.device_id] = pulse_entries
+                        cell_entry = electrode_entry.cell
 
-                        pulse_entry = db.StimPulse(
-                            recording=rec_entry,
-                            pulse_number=pulse.meta['pulse_n'],
-                            onset_time=t0,
-                            amplitude=pulse.meta['pulse_amplitude'],
-                            duration=t1-t0,
-                            data=resampled.data,
-                            data_start_time=resampled.t0,
-                            #cell=electrode_entry.cell if electrode_entry is not None else None,
-                            cell=cell_entry,
-                            #device_name=str(rec.device_id),
-                            previous_pulse_dt=prev_pulse_dt
-                        )
-                        session.add(pulse_entry)
-                        pulse_entries[pulse.meta['pulse_n']] = pulse_entry
+                        for i,pulse in enumerate(pulses):
+                            # Record information about all pulses, including test pulse.
+                            t0, t1 = pulse.meta['pulse_edges']
+                            sr = min(pulse['primary'].sample_rate, 20000)
+                            resampled = pulse['primary'].resample(sample_rate=sr)
+                            
+                            clock_time = t0 + datetime_to_timestamp(rec_entry.start_time)
+                            prev_pulse_dt = clock_time - last_stim_pulse_time.get(cell_entry.ext_id, -np.inf)
+                            last_stim_pulse_time[cell_entry.ext_id] = clock_time
+
+                            pulse_entry = db.StimPulse(
+                                recording=rec_entry,
+                                pulse_number=pulse.meta['pulse_n'],
+                                onset_time=t0,
+                                amplitude=pulse.meta['pulse_amplitude'],
+                                duration=t1-t0,
+                                data=resampled.data,
+                                data_start_time=resampled.t0,
+                                #cell=electrode_entry.cell if electrode_entry is not None else None,
+                                cell=cell_entry,
+                                #device_name=str(rec.device_id),
+                                previous_pulse_dt=prev_pulse_dt
+                            )
+                            session.add(pulse_entry)
+                            pulse_entries[pulse.meta['pulse_n']] = pulse_entry
+
+                        # import presynaptic evoked spikes
+                        # For now, we only detect up to 1 spike per pulse, but eventually
+                        # this may be adapted for more.
+                        spikes = psa.evoked_spikes()
+                        for i,sp in enumerate(spikes):
+                            pulse = pulse_entries[sp['pulse_n']]
+                            pulse.n_spikes = len(sp['spikes'])
+                            for i,spike in enumerate(sp['spikes']):
+                                spike_entry = db.StimSpike(
+                                    stim_pulse=pulse,
+                                    onset_time=spike['onset_time'],
+                                    peak_time=spike['peak_time'],
+                                    max_slope_time=spike['max_slope_time'],
+                                    max_slope=spike['max_slope'],
+                                    peak_diff=spike.get('peak_diff'),
+                                    peak_value=spike['peak_value'],
+                                )
+                                session.add(spike_entry)
+                                if i == 0:
+                                    # pulse.first_spike = spike_entry
+                                    pulse.first_spike_time = spike_entry.max_slope_time
 
 
                 #elif isinstance(rec, OptoRecording) and (rec.device_name=='Fidelity'): 
@@ -164,10 +197,15 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                     if stim_num is None: ### this is a trace that would have been labeled as 'unknown'
                         continue
                     stim = stim_log[str(int(stim_num))]
-                    cell_entry = cell_entries[stim['stimulationPoint']['name']]
+                    if stim_log_version == 0:
+                        point_name = 'Point %i' % stim['stimulationPoint'] 
+                    else:
+                        point_name = stim['stimulationPoint']['name']
+                    #cell_entry = cell_entries.get(cell_name)
+                    cell_entry = cells_by_stim_point_id.get(point_name)
 
                     ## get stimulation shape parameters
-                    if stim_log['version'] >=3:
+                    if stim_log_version >=3:
                         shape={'spiral_revolutions':stim['shape']['spiral revolutions'], 'spiral_size':stim['shape']['size']}
                     else:
                         ## need to calculate spiral size from reference image, cause stimlog is from before we were saving spiral size
@@ -202,10 +240,10 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                         #resampled = pulse['reporter'].resample(sample_rate=20000)
 
                         t0, t1 = pulse[0], pulse[1]
-                        
-                        clock_time = t0 + datetime_to_timestamp(rec_entry.start_time)
-                        prev_pulse_dt = clock_time - last_stim_pulse_time.get(cell_entry.ext_id, -np.inf)
-                        last_stim_pulse_time[cell_entry.ext_id] = clock_time
+                        if cell_entry is not None:
+                            clock_time = t0 + datetime_to_timestamp(rec_entry.start_time)
+                            prev_pulse_dt = clock_time - last_stim_pulse_time.get(cell_entry.ext_id, -np.inf)
+                            last_stim_pulse_time[cell_entry.ext_id] = clock_time
                         pulse_entry = db.StimPulse(
                             recording=rec_entry,
                             cell=cell_entry,
@@ -218,7 +256,7 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                             #data_start_time=resampled.t0,
                             #wavelength,
                             #light_source,
-                            position=stim['stimPos'],
+                            position=stim.get('stimPos', stim.get('pos')), ### older stim log versions don't have stimPos
                             #position_offset=stim['offset'],
                             #device_name=rec.device_id,
                             #qc_pass=None
@@ -234,6 +272,8 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                         pulse_entry.qc_pass = qc_pass
                         if not qc_pass:
                             pulse_entry.meta['qc_failures'] = qc_failures
+                        if cell_entry is None:
+                            pulse_entry.meta.get('warnings', []).append('No cell with stim point "%s" was found in this experiment.' % point_name)
 
                         session.add(pulse_entry)
                         pulse_entries[i] = pulse_entry
@@ -331,9 +371,9 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                 if stim_rec.device_type in ['Prairie_Command', 'unknown']: ### these don't actually contain data we want to use -- ignore them
                     continue
                 if isinstance(stim_rec, PatchClampRecording):
-                    ### exclude trying to analyze intrinsic pulses
+                    ### only analyze pulses meant for testing connectivity
                     stim_name = stim_rec.stimulus.description
-                    if any(substr in stim_name for substr in ['intrins']):
+                    if not any(substr in stim_name for substr in ['pulsetrain','recovery', 'pulstrn']):
                         continue
 
                 for post_rec in [x for x in srec.recordings if isinstance(x, PatchClampRecording)]:
@@ -346,18 +386,24 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                             continue
                         
                         stim = stim_log[str(int(stim_num))]
-                        pre_cell_name = str(stim['stimulationPoint']['name'])
+                        if stim_log_version == 0:
+                            pre_point_name = 'Point %i' % stim['stimulationPoint'] 
+                        else:
+                            pre_point_name = stim['stimulationPoint']['name']
 
-                        post_cell_name = str('electrode_'+ str(post_rec.device_id))
+                        pre_cell = cells_by_stim_point_id.get(pre_point_name)
+                        post_cell_name = elecs_by_ad_channel[post_rec.device_id].cell.ext_id
+                        if pre_cell is None:
+                            continue ## no point in adding PulseResponses if we don't have one of the cells - sometimes happens when data collection gets messed up during a crash
 
-                        pair_entry = pairs_by_cell_id.get((pre_cell_name, post_cell_name))
-
+                        pair_entry = pairs_by_cell_id.get((pre_cell.ext_id, post_cell_name))
+                        
                     elif 'led' in stim_rec.device_type.lower():
                         pair_entry = None
 
                     elif isinstance(stim_rec, PatchClampRecording):
-                        pre_cell_name = str('electrode_' + str(stim_rec.device_id))
-                        post_cell_name = str('electrode_'+ str(post_rec.device_id))
+                        pre_cell_name = elecs_by_ad_channel[stim_rec.device_id].cell.ext_id
+                        post_cell_name = elecs_by_ad_channel[post_rec.device_id].cell.ext_id
                         pair_entry = pairs_by_cell_id.get((pre_cell_name, post_cell_name))
 
                     # get all responses, regardless of the presence of a spike
@@ -371,7 +417,8 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
                             if resp['in_qc_pass']:
                                 pair_entry.n_in_test_spikes += 1
                             
-                        resampled = resp['response']['primary'].resample(sample_rate=20000)
+                        sr = min(resp['response']['primary'].sample_rate, 20000)
+                        resampled = resp['response']['primary'].resample(sample_rate=sr)
                         resp_entry = db.PulseResponse(
                             recording=rec_entries[post_rec.device_id],
                             stim_pulse=all_pulse_entries[stim_rec.device_id][resp['pulse_n']],
@@ -391,8 +438,9 @@ class OptoDatasetPipelineModule(DatabasePipelineModule):
 
                             # pull data and run qc if needed
                             if key not in baseline_qc_cache:
-                                data = post_rec['primary'].time_slice(start, stop).resample(sample_rate=db.default_sample_rate).data
-                                ex_qc_pass, in_qc_pass, qc_failures = qc.opto_pulse_response_qc_pass(post_rec, [start, stop])
+                                sr = min(post_rec['primary'].sample_rate, db.default_sample_rate)
+                                data = post_rec['primary'].time_slice(start, stop).resample(sample_rate=sr).data
+                                ex_qc_pass, in_qc_pass, qc_failures = qc.opto_pulse_response_qc_pass(post_rec, [start, stop], start+(stop-start)/2.)
                                 baseline_qc_cache[key] = (data, ex_qc_pass, in_qc_pass)
                             else:
                                 (data, ex_qc_pass, in_qc_pass) = baseline_qc_cache[key]

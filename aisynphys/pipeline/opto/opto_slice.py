@@ -1,27 +1,25 @@
 from aisynphys.pipeline.pipeline_module import DatabasePipelineModule
 from optoanalysis import data_model
-#from multipatch_analysis.database import slice_tables
 import os, glob, re, pickle, time, csv
 from aisynphys import config, lims, constants
-from acq4.util.DataManager import getDirHandle
+from acq4.analysis.dataModels.PatchEPhys import getParent
 from collections import OrderedDict
 from aisynphys.util import datetime_to_timestamp, timestamp_to_datetime
-#import multipatch_analysis.database as db
+from neuroanalysis.util.optional_import import optional_import
+getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 
-
-#from .opto_experiment import OptoExperimentPipelineModule
 
 class OptoSlicePipelineModule(DatabasePipelineModule):
 
     name = 'opto_slice'
     depencencies = []
-    #table_group = slice_tables
     table_group = ['slice']
 
     @classmethod
     def create_db_entries(cls, job, session):
         job_id = job['job_id']
         db = job['database']
+        errors = []
 
         slices = all_slices()
         path = slices[job_id]
@@ -34,11 +32,10 @@ class OptoSlicePipelineModule(DatabasePipelineModule):
         dh = getDirHandle(path)
         info = dh.info()
         parent_info = dh.parent().info()
-        
+
         # pull some metadata from LIMS
         #sid = self.find_specimen_name(dh)
         sids = data_model.find_lims_specimen_ids(dh)
-        #print('sids:', sids)
         if len(sids) == 0:
             limsdata = {}
         elif len(sids) == 1:
@@ -53,6 +50,8 @@ class OptoSlicePipelineModule(DatabasePipelineModule):
                 if len(vals) == 1:
                     limsdata[key] = vals[0]
 
+        if len(limsdata) == 0:
+            errors.append("Could not find limsdata for slice %s" % path)
 
         quality = info.get('slice quality', None)
         try:
@@ -82,13 +81,17 @@ class OptoSlicePipelineModule(DatabasePipelineModule):
                 raise KeyError("Injection %r is unknown in constants.INJECTIONS" % inj)
             genotype = genotype + ';' + constants.INJECTIONS[inj]
 
+        ## calculate animal age if that data is not entered in lims
+        age = limsdata.get('age')
+        if age == 0 and len(limsdata) > 0:
+            age = (timestamp_to_datetime(info['__timestamp__'])-limsdata['date_of_birth']).days
 
         fields = {
             'ext_id':'%.3f'%info['__timestamp__'],
             'acq_timestamp': info['__timestamp__'],
             'species': limsdata.get('organism'),
             'date_of_birth': limsdata.get('date_of_birth'),
-            'age': limsdata.get('age'),
+            'age': age,
             'sex': limsdata.get('sex'),
             'genotype': genotype,
             'orientation': limsdata.get('plane_of_section'),
@@ -104,6 +107,7 @@ class OptoSlicePipelineModule(DatabasePipelineModule):
         sl = db.Slice(**fields)
         session.add(sl)
         session.commit()
+        return errors
 
     def job_records(self, job_ids, session):
         """Return a list of records associated with a list of job IDs.
@@ -153,7 +157,6 @@ def all_slices():
             print("Loaded slice timestamps from cache (%0.1f hours old)" % (age/3600.))
             return pickle.load(open(cachefile, 'r'))
     
-    #slice_dirs = sorted(glob.glob(os.path.join(config.synphys_data, '*', 'slice_*')))
     expt_csv = config.experiment_csv
     csv_entries = []
     with open(expt_csv, 'r') as csv_file:
@@ -161,18 +164,41 @@ def all_slices():
         for row in reader:
             csv_entries.append(row)
 
-    slice_dirs = sorted([os.path.split(os.path.join(config.synphys_data, exp['site_path']))[0] for exp in csv_entries])
-
     _all_slices = OrderedDict()
-    for path in slice_dirs:
-        dh = getDirHandle(path)
-        ts = dh.info().get('__timestamp__')
-        if ts is None:
-            #print("MISSING TIMESTAMP: %s" % path)
+    errors = {}
+    for exp in csv_entries:
+        expt_name = exp['experiment'].split('_conn')[0]
+        if exp['site_path'] == '':
             _all_slices.update([('%.3f'%0.0, 'place_holder')])
             continue
+
+        site_path = os.path.join(config.synphys_data, exp['rig_name'].lower(), 'phys', exp['site_path'])
+        site_dh = getDirHandle(site_path)
+        if not site_dh.exists():
+            errors[expt_name]="%s does not exist." % site_path
+            continue
+        if site_dh.info().get('dirType') != 'Site':
+            errors[expt_name]="%s is not a site directory." % site_path
+            continue
+        slice_dh = site_dh.parent()
+        if slice_dh.info().get('dirType') != 'Slice':
+            errors[expt_name]="Parent of %s is not a slice directory." % site_path
+            continue
+
+        ts = slice_dh.info().get('__timestamp__')
+        if ts is None:
+            #print("MISSING TIMESTAMP: %s" % path)
+            #_all_slices.update([('%.3f'%0.0, 'place_holder')])
+            errors[expt_name]= "Slice directory %s is missing a timestamp." % slice_dh.path
+            continue
+
         ts = '%0.3f'%ts ## convert timestamp to string here, make sure it has 3 decimal places
-        _all_slices[ts] = path
+        _all_slices[ts] = slice_dh.path
+
+    if len(errors) > 0:
+        print("Encountered %i errors:" % len(errors))
+        for k, v in errors.items():
+            print("    %s : %s" %(k,v))
         
     try:
         tmpfile = cachefile+'.tmp'

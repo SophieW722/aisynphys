@@ -1,24 +1,27 @@
 from aisynphys.pipeline.pipeline_module import DatabasePipelineModule
-#import multipatch_analysis.database as db
 from aisynphys import config
 from .opto_slice import OptoSlicePipelineModule
 from collections import OrderedDict
 import csv, codecs, glob, os
-from acq4.util.DataManager import getDirHandle
 from neuroanalysis.data.experiment import AI_Experiment
-#from neuroanalysis.data.libraries import opto
 from neuroanalysis.data.loaders.opto_experiment_loader import OptoExperimentLoader
 from optoanalysis import data_model
+from ... import config
+from neuroanalysis.util.optional_import import optional_import
+getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 
-##### TODO: GO BACK TO EXPERIEMENT BEING DEPENDENT ON SLICE -- IN ALL SLICES USE EXPERIMENTS.CSV TO COME UP WITH SLICE LIST
 
 class OptoExperimentPipelineModule(DatabasePipelineModule):
     """Imports per-experiment metadata into DB.
     """
     name = 'opto_experiment'
     dependencies = [OptoSlicePipelineModule]
-    #table_group = db.experiment_tables
     table_group = ['experiment', 'electrode', 'cell', 'pair']
+
+    # @classmethod
+    # def create_db_entries(cls, job, session, expt=None):
+    #     import profile
+    #     profile.runctx('cls.create_db_entries_real(job, session, expt)', globals(), {'cls':cls, 'job':job, 'session':session, 'expt':expt}, filename='expt_profile_%s.txt'%job['job_id'])
 
     @classmethod
     def create_db_entries(cls, job, session, expt=None):
@@ -36,16 +39,18 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
             slice_entry = db.slice_from_timestamp(ts, session=session)
 
             fields = {
-                'storage_path': expt.path, 
-                'ephys_file': None if expt.loader.get_ephys_file() is None else os.path.relpath(expt.loader.get_ephys_file(), expt.path),
-                'rig_name': expt.rig_name,
+                'ext_id': expt.ext_id,
                 'project_name': expt.project_name,
-                'acq_timestamp': expt.info.get('site_info',{}).get('__timestamp__') ,
+                'date': expt.datetime,
                 'target_region': expt.target_region,
                 'internal': expt.expt_info.get('internal'),
                 'acsf': expt.expt_info.get('solution'),
                 'target_temperature': expt.target_temperature,
-                'ext_id': expt.ext_id
+                'rig_name': expt.rig_name,
+                'operator_name': expt.rig_operator,
+                'storage_path': None if expt.path is None else os.path.relpath(expt.path, config.synphys_data), 
+                'ephys_file': None if expt.loader.get_ephys_file() is None else os.path.relpath(expt.loader.get_ephys_file(), expt.path),
+                'acq_timestamp': expt.info.get('site_info',{}).get('__timestamp__')     
             }
 
             expt_entry = db.Experiment(**fields)
@@ -56,49 +61,53 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
             for name, cell in expt.cells.items():
                 if cell.electrode is not None:
                     elec = cell.electrode
-                    elec_entry = db.Electrode(experiment=expt_entry, ext_id=elec.electrode_id, device_id=elec.device_id)
-                    for k in ['patch_status', 'start_time', 'stop_time',  
-                        'initial_resistance', 'initial_current', 'pipette_offset',
-                        'final_resistance', 'final_current']:
-                        if hasattr(elec, k):
-                            setattr(elec_entry, k, getattr(elec, k))
+                    elec_entry = db.Electrode(
+                        experiment=expt_entry, 
+                        ext_id=elec.electrode_id, 
+                        patch_status=elec.patch_status,
+                        start_time=elec.start_time,
+                        stop_time=elec.stop_time,
+                        device_id=elec.device_id)
                     session.add(elec_entry)
 
                 cell_entry = db.Cell(
                     experiment=expt_entry,
-                    electrode=elec_entry if cell.electrode is not None else None,
                     ext_id=cell.cell_id,
+                    electrode=elec_entry if cell.electrode is not None else None,
                     cre_type=cell.cre_type,
                     target_layer=cell.target_layer,
-                    depth=cell.depth,
                     position=cell.position,
+                    depth=cell.depth,
                     cell_class=None, ## fill in cell class fields later in Morphology module (that doesn't currently exist for opto)
                     cell_class_nonsynaptic=None,
+                    meta=cell.info
                 )
                 session.add(cell_entry)
                 cell_entries[cell] = cell_entry
 
+            pair_entries = {}
             for name, pair in expt.pairs.items():
-                if pair._connection_call == 'excitatory':
-                    sign = +1
-                elif pair._connection_call == 'inhibitory':
-                    sign = -1
-                else:
-                    sign = 0
                 pair_entry = db.Pair(
                     experiment=expt_entry,
                     pre_cell=cell_entries[pair.preCell],
                     post_cell=cell_entries[pair.postCell],
                     has_synapse=pair.isSynapse(),
+                    # has_polysynapse,
                     has_electrical=None,
-                    n_ex_test_spikes=0,  # will be counted in opto_dataset_pipeline_module
-                    n_in_test_spikes=0,
+                    # crosstalk_artifact,
+                    n_ex_test_spikes=0,  # will be counted in opto_dataset pipeline module
+                    n_in_test_spikes=0,  # will be counted in opto_dataset pipeline module
                     distance=pair.distance,
-                    #synapse_sign = sign
+                    # lateral_distance,  # should these be filled in in the opto_cortical_location pipeline module?
+                    # vertical_distance, 
+                    # reciprocal_id, # fill this in below
                 )
+                pair_entries[name] = pair_entry
                 session.add(pair_entry)
 
-            #session.commit()
+            ## fill in reciprocal ids
+            for name, pair in expt.pairs.items():
+                pair_entries[name].reciprocal = pair_entries.get((name[1],name[0]))
 
         except:
             session.rollback()
@@ -141,19 +150,22 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
         print("checking for ready expts....")
         for i, expt in enumerate(expts['expt_list']):
             #print("Checking experiment %i/%i"%(i, len(expts['expt_list'])))
-            site_path = os.path.join(config.synphys_data, expt['site_path'])
-            slice_path = getDirHandle(os.path.split(site_path)[0]).name(relativeTo=getDirHandle(config.synphys_data))
-            #print slice_paths
-            #if not slice_path in slice_paths:
-            #    #print("Did not find slice path for %s"%slice_path)
-            #    n_no_slice += 1
-            #    continue
+            expt['connections_dir'] = config.connections_dir
             try:
                 if expt['site_path'] == '':
                     cnx_json = os.path.join(config.connections_dir, expt['experiment'])
-                    ex = AI_Experiment(loader=OptoExperimentLoader(load_file=cnx_json), meta_info=expt)
+                    if not os.path.exists(cnx_json):
+                        n_errors[expt['experiment']] = "File not found: %s" % cnx_json
+                        continue
+                    site_path = cnx_json
+                    ex = AI_Experiment(loader=OptoExperimentLoader(load_file=cnx_json, meta_info=expt), verify=True)
                 else:
-                    ex = AI_Experiment(loader=OptoExperimentLoader(site_path=site_path))
+                    site_path = os.path.join(config.synphys_data, expt['rig_name'].lower(), 'phys', expt['site_path'])
+                    slice_path = getDirHandle(os.path.split(site_path)[0]).name(relativeTo=getDirHandle(config.synphys_data))
+                    if not slice_path in slice_paths:
+                        n_no_slice.append(expt['experiment'])
+                        continue
+                    ex = AI_Experiment(loader=OptoExperimentLoader(site_path=site_path, meta_info=expt), verify=True)
 
                 raw_data_mtime = ex.last_modification_time
                 
@@ -163,7 +175,6 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
                 slice_mtime, slice_success = finished_slices.get('%.3f'%slice_ts, (None, None))
                 #print('found expt for path:', site_path)
             except Exception as exc:
-                raise
                 n_errors[expt['experiment']] = exc
                 continue
             if slice_mtime is None or slice_success is False:
@@ -173,7 +184,7 @@ class OptoExperimentPipelineModule(DatabasePipelineModule):
 
             ready[ex.ext_id] = {'dep_time':max(raw_data_mtime, slice_mtime), 'meta':{'source':site_path}}
         
-        print("Found %d experiments; %d are able to be processed, %d were skipped due to errors, %d were skipped due to missing or failed slice entries." % (len(expts['expt_list']), len(ready), len(n_errors), len(n_no_slice)))
+        print("Found %d experiments; %d are able to be processed, %d will be skipped due to errors, %d will be skipped due to missing or failed slice entries." % (len(expts['expt_list']), len(ready), len(n_errors), len(n_no_slice)))
         if len(n_errors) > 0 or len(n_no_slice) > 0:
             print("-------- skipped experiments: ----------")
             for e, exc in n_errors.items():
@@ -233,14 +244,16 @@ def load_experiment(job_id):
 
     entry = all_expts['expt_list'][indices[0]]
     entry['distances'] = [e for e in all_expts['distances'] if e['exp_id']==job_id]
-    #print('create_db_entries for:', entry['site_path'], "job_id:", job_id)
+    entry['connections_dir'] = config.connections_dir ## pass this in so we can look here for a connections file, even if we pass in a site path
+
     if entry['site_path'] != '':
-        #expt = Experiment(site_path=os.path.join(config.synphys_data, entry['site_path']), loading_library=opto, meta_info=entry)
-        expt = AI_Experiment(loader=OptoExperimentLoader(site_path=os.path.join(config.synphys_data, entry['site_path'])), meta_info=entry)
+        site_path = os.path.join(config.synphys_data, entry['rig_name'].lower(), 'phys', entry['site_path'])
+        if not os.path.exists(site_path):
+            raise Exception('%s does not exist' % site_path)
+        expt = AI_Experiment(loader=OptoExperimentLoader(site_path=site_path, meta_info=entry))
     else:
         cnx_json = os.path.join(config.connections_dir, entry['experiment'])
-        #expt = Experiment(load_file=cnx_json, loading_library=opto, meta_info=entry)
-        expt = AI_Experiment(loader=OptoExperimentLoader(load_file=cnx_json), meta_info=entry)
+        expt = AI_Experiment(loader=OptoExperimentLoader(load_file=cnx_json, meta_info=entry))
 
     return expt
 
