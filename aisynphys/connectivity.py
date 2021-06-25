@@ -403,7 +403,7 @@ class ConnectivityModel:
         return -model.likelihood(*args)
 
     @classmethod
-    def fit(cls, x, conn, init=(0.1, 150e-6), bounds=((0.001, 1), (10e-6, 1e-3)), fixed_size=None, fixed_max=None, **kwds):
+    def fit(cls, x, conn, init=(0.1, 150e-6), bounds=((0.001, 1), (10e-6, 1e-3)), fixed_size=None, fixed_max=None, method='L-BFGS-B', **kwds):
         n = 6
         p_bins = np.linspace(bounds[0][0], bounds[0][1], n)
         if fixed_max is not None:
