@@ -935,7 +935,7 @@ class StochasticModelRunner:
 
         # 1. Get a list of all presynaptic spike times and the amplitudes of postsynaptic responses
 
-        events = self._event_query(pair, self.db, session).dataframe()
+        events = self._event_query(pair, self.db, session).dataframe(rename_columns=False)
         logger.info("loaded %d events", len(events))
 
         if len(events) == 0:

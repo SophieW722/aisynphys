@@ -682,7 +682,7 @@ class DBQuery(sqlalchemy.orm.Query):
                 cols.append(col)
         return self.add_columns(*cols)
 
-    def dataframe(self, expand_tables=True):
+    def dataframe(self, expand_tables=True, rename_columns=True):
         """Return a pandas dataframe constructed from the results of this query.
 
         Columns are renamed from the original query (see DBQuery.recarray)
@@ -692,9 +692,14 @@ class DBQuery(sqlalchemy.orm.Query):
         expand_tables : bool | list
             If True, expand all table entities included in the query into individual
             columns. Optionally, a list of table names to expand may be provided instead.
+        rename_columns : bool
+            If True, columns are renamed (see DBQuery.recarray).
         """
         # don't like this; we want a bit more control over how columns are unpacked / renamed
-        #return pandas.read_sql(self.statement, self.session.bind)
+        if not rename_columns:
+            if expand_tables is False:
+                raise NotImplementedError("The combination expand_tables=False, rename_columns=False is not implemented")
+            return pandas.read_sql(self.statement, self.session.bind)
 
         recs, col_names, col_types, rec_fields = self._prepare_array(expand_tables=expand_tables)
 

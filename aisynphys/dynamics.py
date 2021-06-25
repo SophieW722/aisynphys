@@ -354,7 +354,7 @@ def stim_sorted_pulse_amp(pair):
     q = q.filter(db.PatchClampRecording.clamp_mode=='ic')
     q = q.order_by(db.SyncRec.ext_id, db.StimPulse.pulse_number)
 
-    data = q.dataframe()
+    data = q.dataframe(rename_columns=False)
 
     qc_pass_data = data[data['qc_pass']]
     

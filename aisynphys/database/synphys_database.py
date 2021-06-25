@@ -399,7 +399,7 @@ class SynphysDatabase(Database):
                 if columns is not None:
                     pair_query = pair_query.add_columns(*columns)
                 
-                df = pair_query.dataframe()
+                df = pair_query.dataframe(rename_columns=False)
                 df['pre_class'] = pre_name
                 df['post_class'] = post_name
                 if pairs is None:
