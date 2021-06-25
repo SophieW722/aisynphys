@@ -262,9 +262,9 @@ def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_
         'psp_rise_time':                      ('PSP Rise Time',                     'ms',  1e3,  0.5,   [db.Synapse.psp_rise_time],                        'viridis_r',   True,   (1, 10),       "%0.2f\nms"),
         'psp_decay_tau':                      ('PSP Decay Tau',                     'ms',  1e3,  0.01,  [db.Synapse.psp_decay_tau],                        'viridis_r',   True,   (1, 200),      "%0.1f\nms"),
         'psc_amplitude':                      ('PSC Amplitude',                     'pA',  1e12, 0.3,   [db.Synapse.psc_amplitude],                        'bwr',         False,  (-20, 20),     "%0.2g pA"),
-        'psc_rise_time':                      ('PSC Rise Time',                     'ms',  1e3,  1,     [db.Synapse.psc_rise_time],                        'viridis_r',   True,  (0, 6),        "%0.2f ms"),
-        'psc_decay_tau':                      ('PSC Decay Tau',                     'ms',  1e3,  1,     [db.Synapse.psc_decay_tau],                        'viridis_r',   True,  (0, 20),       "%0.1f\nms"),
-        'latency':                            ('Latency',                           'ms',  1e3,  1,     [db.Synapse.latency],                              'viridis_r',   True,  (0.5, 3),      "%0.2f\nms"),
+        'psc_rise_time':                      ('PSC Rise Time',                     'ms',  1e3,  1,     [db.Synapse.psc_rise_time],                        'viridis_r',   True,   (.1, 6),       "%0.2f ms"),
+        'psc_decay_tau':                      ('PSC Decay Tau',                     'ms',  1e3,  1,     [db.Synapse.psc_decay_tau],                        'viridis_r',   True,   (2, 20),       "%0.1f\nms"),
+        'latency':                            ('Latency',                           'ms',  1e3,  1,     [db.Synapse.latency],                              'viridis_r',   True,   (0.5, 3),      "%0.2f\nms"),
         'pulse_amp_90th_percentile':          ('PSP Amplitude 90th %%ile',          'mV',  1e3,  1.5,   [db.Dynamics.pulse_amp_90th_percentile],           'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
         'junctional_conductance':             ('Junctional Conductance',            'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],           'viridis',     False,  (0, 10),       "%0.2f nS"),
         'coupling_coeff_pulse':               ('Coupling Coefficient',              '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],             'viridis',     False,  (0, 1),        "%0.2f"),
@@ -427,13 +427,6 @@ def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, p
     error = pairs_has_metric.groupby(['pre_class', 'post_class']).aggregate(lambda x: np.std(x))
     count = pairs_has_metric.groupby(['pre_class', 'post_class']).count()
 
-    clim = clim or default_clim
-    cmap = matplotlib.cm.get_cmap(cmap)
-    if cmap_log:
-        norm = matplotlib.colors.LogNorm(vmin=clim[0], vmax=clim[1], clip=False)
-    else:
-        norm = matplotlib.colors.Normalize(vmin=clim[0], vmax=clim[1], clip=False)
-
     shape = (len(pre_classes), len(post_classes))
     data = np.zeros(shape)
     data_alpha = np.zeros(shape)
@@ -452,22 +445,31 @@ def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, p
             data[i, j] = value * scale
             data_str[i, j] = cell_fmt % (value * scale) if np.isfinite(value) else ""
             data_alpha[i, j] = 1-alpha*((std*scale)/np.sqrt(n)) if np.isfinite(value) else 0 
-            
+
     pre_labels = [class_labels[cls] for cls in pre_classes]
     post_labels = [class_labels[cls] for cls in post_classes]
+
+    clim = clim or default_clim
+    cmap = matplotlib.cm.get_cmap(cmap)
+    if cmap_log:
+        norm = matplotlib.colors.LogNorm(vmin=clim[0], vmax=clim[1], clip=False)
+    else:
+        norm = matplotlib.colors.Normalize(vmin=clim[0], vmax=clim[1], clip=False)
+
     mapper = matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
     data_rgb = mapper.to_rgba(data)
     data_rgb[:,:,3] = np.clip(data_alpha, 0, 1)
 
-    im, cbar = heatmap(data_rgb, pre_labels, post_labels,
-                    ax=ax,
-                    ax_labels=('postsynaptic', 'presynaptic'),
-                    bg_color=(0.8, 0.8, 0.8),
-                    cmap=cmap,
-                    norm=norm,
-                    cbarlabel=metric_name,
-                    cbar_kw={'shrink':0.5, 'pad':0.02},
-                    )
+    im, cbar = heatmap(
+        data_rgb, pre_labels, post_labels,
+        ax=ax,
+        ax_labels=('postsynaptic', 'presynaptic'),
+        bg_color=(0.8, 0.8, 0.8),
+        cmap=cmap,
+        norm=norm,
+        cbarlabel=metric_name,
+        cbar_kw={'shrink':0.5, 'pad':0.02},
+    )
 
     text = annotate_heatmap(im, data_str, data=data, fontsize=8)
 
