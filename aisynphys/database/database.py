@@ -46,7 +46,7 @@ class NDArray(TypeDecorator):
         return buf.getvalue()
         
     def process_result_value(self, value, dialect):
-        if value == b'':
+        if value is None or value == b'':
             return None
         buf = io.BytesIO(value)
         return np.load(buf, allow_pickle=False)
