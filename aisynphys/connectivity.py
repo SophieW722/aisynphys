@@ -182,17 +182,18 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
             'probed_pairs': probed_pairs,
         }
 
-        if sigma is not None or fit_model is not None:
-            distances = np.array([getattr(p, dist_measure) for p in probed_pairs], dtype=float)
-            connections = np.array([p.synapse for p in probed_pairs], dtype=bool)
-            gap_distances = np.array([getattr(p, dist_measure) for p in gaps_probed], dtype=float)
-            gaps = np.array([p.has_electrical for p in gaps_probed], dtype=bool)
-            mask = np.isfinite(distances) & np.isfinite(connections)
-            results[(pre_class, post_class)]['probed_distances'] = distances[mask]
-            results[(pre_class, post_class)]['connected_distances'] = connections[mask]
-            mask2 = np.isfinite(gap_distances) & np.isfinite(gaps)
-            results[(pre_class, post_class)]['gap_probed_distances'] = gap_distances[mask2]
-            results[(pre_class, post_class)]['gap_distances'] = gaps[mask2]
+        distances = np.array([getattr(p, dist_measure) for p in probed_pairs], dtype=float)
+        connections = np.array([p.synapse for p in probed_pairs], dtype=bool)
+        gap_distances = np.array([getattr(p, dist_measure) for p in gaps_probed], dtype=float)
+        gaps = np.array([p.has_electrical for p in gaps_probed], dtype=bool)
+        mask = np.isfinite(distances) & np.isfinite(connections)
+        results[(pre_class, post_class)]['probed_distances'] = distances[mask]
+        results[(pre_class, post_class)]['connected_distances'] = connections[mask]
+        mask2 = np.isfinite(gap_distances) & np.isfinite(gaps)
+        results[(pre_class, post_class)]['gap_probed_distances'] = gap_distances[mask2]
+        results[(pre_class, post_class)]['gap_distances'] = gaps[mask2]
+        
+        if sigma is not None and fit_model is not None:
             fit = fit_model.fit(distances[mask], connections[mask], method='L-BFGS-B', fixed_size=sigma)
             results[(pre_class, post_class)]['connectivity_fit'] = fit
             gap_fit = fit_model.fit(gap_distances[mask2], gaps[mask2], method='L-BFGS-B', fixed_size=sigma)

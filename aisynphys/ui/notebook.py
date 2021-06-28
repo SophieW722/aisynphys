@@ -577,7 +577,7 @@ def show_distance_profiles(ax, results, colors, class_labels):
     return ax
 
 
-def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=None, fit_label=None):
+def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=None, fit_label=None, show_labels=False):
     # where to bin connections for measuring connection probability
     x_bins = np.arange(0, 500e-6, 40e-6)
 
@@ -597,13 +597,14 @@ def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=Non
     tickheight = ymax / 10
     show_connectivity_raster(x_probed, conn, tickheight, ax)
 
-    # err = 0 if not hasattr(fit, 'fit_result') else fit.fit_result.fun
-    # label = "Fit pmax=%0.2f\nsize=%0.2f µm\nerr=%f" % (fit.pmax, fit.size*1e6, err)
-    # ax.text(0.99, 0.85, label, transform=ax.transAxes, color=(0.5, 0, 0), horizontalalignment='right')
-    
-    # if true_model is not None:
-    #     label = "True pmax=%0.2f\nsize=%0.2f µm" % (true_model.pmax, true_model.size*1e6)
-    #     ax.text(0.99, 0.95, label, transform=ax.transAxes, color=(0, 0.5, 0), horizontalalignment='right')
+    if show_labels is True:
+        err = 0 if not hasattr(fit, 'fit_result') else fit.fit_result.fun
+        label = "Fit pmax=%0.2f\nsize=%0.2f µm\nerr=%f" % (fit.pmax, fit.size*1e6, err)
+        ax.text(0.99, 0.85, label, transform=ax.transAxes, color=(0.5, 0, 0), horizontalalignment='right')
+        
+        if true_model is not None:
+            label = "True pmax=%0.2f\nsize=%0.2f µm" % (true_model.pmax, true_model.size*1e6)
+            ax.text(0.99, 0.95, label, transform=ax.transAxes, color=(0, 0.5, 0), horizontalalignment='right')
     
     ax.axhline(0, color=(0, 0, 0))
     set_distance_xticks(x_vals, ax)
@@ -613,6 +614,7 @@ def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=Non
     ax.set_yticklabels(['probed', 'connected'] + ['%0.1f'%x for x in y_vals])
     ax.set_ylim(-tickheight*2.6, ymax)
 
+
 def show_connectivity_fit(x_vals, fit, ax, color=(0.5, 0, 0), true_model=None, label=None):
     if true_model is not None:
         # plot the ground-truth probability distribution (solid green)
@@ -621,10 +623,12 @@ def show_connectivity_fit(x_vals, fit, ax, color=(0.5, 0, 0), true_model=None, l
     if label is not None:
         ax.legend()
 
+
 def show_distance_binned_cp(x_bins, cprop, ax, color=(0.5, 0.5, 0.5), ci_lower=None, ci_upper=None):
     ax.plot(x_bins, np.append(cprop, cprop[-1]), drawstyle='steps-post', color=color)
     if ci_lower is not None and ci_upper is not None:
         ax.fill_between(x_bins, np.append(ci_lower, ci_lower[-1]), np.append(ci_upper, ci_upper[-1]), step='post', facecolor=color + (0.3,))
+
 
 def show_connectivity_raster(x_probed, conn, tickheight, ax, color=(0, 0, 0), offset=2):
     # plot connections probed and found
@@ -634,11 +638,13 @@ def show_connectivity_raster(x_probed, conn, tickheight, ax, color=(0, 0, 0), of
     ax.eventplot(x_probed.copy(), lineoffsets=-tickheight*offset, linelengths=tickheight, color=(color + (alpha1,)))
     ax.eventplot(x_probed[conn], lineoffsets=-tickheight*(offset-1), linelengths=tickheight, color=(color + (alpha2,)))
 
+
 def set_distance_xticks(x_vals, ax, interval=50e-6):
     ax.set_xlabel('distance (µm)')
     xticks = np.arange(0, x_vals.max(), interval)
     ax.set_xticks(xticks)
     ax.set_xticklabels(['%0.0f'%(x*1e6) for x in xticks])
+
 
 def color_by_conn_prob(pair_group_keys, connectivity, norm, cmap):
     """ Return connection probability mapped color from show_connectivity_matrix
