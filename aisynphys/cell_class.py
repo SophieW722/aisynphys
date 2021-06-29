@@ -385,7 +385,7 @@ def classify_cell_dataframe(cell_classes, df, prefix=''):
     """
     import pandas
     match = pandas.Series([None] * len(df), dtype=object)
-    for k, cls in reversed(cell_classes.items()):
+    for k, cls in reversed(list(cell_classes.items())):
         mask = cls.dataframe_mask(df, prefix=prefix)
         match[mask] = k
 
