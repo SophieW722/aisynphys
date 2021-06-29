@@ -756,7 +756,13 @@ class DBQuery(sqlalchemy.orm.Query):
 
     def _prepare_array(self, expand_tables):
         recs = self.all()
-        if len(recs) > 0 and not isinstance(recs[0], tuple):
+        row_types = (tuple,)
+        try:
+            row_types = row_types + (sqlalchemy.engine.row.Row,)
+        except AttributeError:
+            pass
+
+        if len(recs) > 0 and not isinstance(recs[0], row_types):
             # sqlalchemy returns lists of keyed tuples in most cases, but lists of ORM instances if only one
             # column was requested. This is a pain to handle later on, so we're normalizing the output here.
             rectyp = namedtuple('record', [self.column_descriptions[0]['name']])
@@ -767,7 +773,12 @@ class DBQuery(sqlalchemy.orm.Query):
         col_types = []
         rec_fields = []
         for col in self.column_descriptions:
-            if isinstance(col['type'], sqlalchemy.ext.declarative.api.DeclarativeMeta):
+            try:
+                from sqlalchemy.ext.declarative.api import DeclarativeMeta
+            except ImportError:
+                from sqlalchemy.orm.decl_api import DeclarativeMeta
+
+            if isinstance(col['type'], DeclarativeMeta):
                 # this column holds an entire table; use table name unless aliased
                 table_name = col['entity'].__table__.name
                 aliased_table_name = col['name'] if col['aliased'] else table_name
