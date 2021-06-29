@@ -10,7 +10,6 @@ import re
 import traceback
 import pickle
 from collections import OrderedDict
-
 import yaml
 
 from .. import lims, config
@@ -22,7 +21,9 @@ from .pair import Pair
 from .electrode import Electrode
 from .data import MultiPatchDataset
 from .pipette_metadata import PipetteMetadata
-import pyqtgraph.configfile as configfile
+
+from neuroanalysis.util.optional_import import optional_import
+configfile = optional_import('pyqtgraph.configfile')
 
 
 class Experiment(object):

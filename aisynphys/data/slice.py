@@ -3,7 +3,9 @@ import os.path, re, datetime
 from .. import lims
 from ..constants import ALL_CRE_TYPES, ALL_LABELS, FLUOROPHORES, LAYERS, INJECTIONS
 from ..genotypes import Genotype
-import pyqtgraph.configfile as configfile
+
+from neuroanalysis.util.optional_import import optional_import
+configfile = optional_import('pyqtgraph.configfile')
 
 
 class Slice(object):
