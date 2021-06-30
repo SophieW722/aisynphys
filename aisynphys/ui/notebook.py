@@ -255,6 +255,42 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
     return im, cbar, labels
 
 
+def generate_connectivity_matrix(db, cell_classes, pair_query_args, ax):
+    from ..connectivity import measure_connectivity
+    from ..cell_class import classify_cells, classify_pairs
+
+    pairs = db.pair_query(**pair_query_args).all()
+
+    # Group all cells by selected classes
+    cell_groups = classify_cells(cell_classes.values(), pairs=pairs)
+
+    # Group pairs into (pre_class, post_class) groups
+    pair_groups = classify_pairs(pairs, cell_groups)
+
+    # analyze matrix elements
+    results = measure_connectivity(pair_groups, sigma=100e-6, dist_measure='lateral_distance')
+
+    # define a colormap and log normalization used to color the heatmap
+    norm = matplotlib.colors.LogNorm(vmin=0.01, vmax=1.0, clip=True)
+    cmap = matplotlib.cm.get_cmap('plasma')    
+
+    class_labels = {x:x for x in cell_classes.keys()}
+
+    # finally, draw the colormap using the provided function:
+    im, cbar, labels = show_connectivity_matrix(
+        ax=ax, 
+        results=results, 
+        pre_cell_classes=cell_classes.values(), 
+        post_cell_classes=cell_classes.values(), 
+        class_labels=class_labels, 
+        cmap=cmap, 
+        norm=norm,
+        distance_adjusted=True
+    )
+
+    return results, (im, cbar, labels)
+
+
 def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_args=None, metrics=None):
     synapse_metrics = {
         #                                     name                                  unit   scale alpha  db columns                                         colormap       log     clim           text format
