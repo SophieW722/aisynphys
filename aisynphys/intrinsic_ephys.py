@@ -30,21 +30,13 @@ def get_chirp_features(recordings, cell_id=''):
 
     sweep_set = SweepSet(sweep_list) 
     try:
-        all_chirp_features = extract_chirp_fft(sweep_set, min_freq=1, max_freq=15)
-        results = {
-            'chirp_peak_freq': all_chirp_features['peak_freq'],
-            'chirp_3db_freq': all_chirp_features['3db_freq'],
-            'chirp_peak_ratio': all_chirp_features['peak_ratio'],
-            'chirp_peak_impedance': all_chirp_features['peak_impedance'] * 1e9, #unscale from mV/pA,
-            'chirp_sync_freq': all_chirp_features['sync_freq'],
-            'chirp_inductive_phase': all_chirp_features['total_inductive_phase'],
-        }
+        chirp_features = extract_chirp_fft(sweep_set, min_freq=1, max_freq=15)
     except FeatureError as exc:
         logger.warning(f'Error processing chirps for cell {cell_id}: {str(exc)}')
         errors.append('Error processing chirps for cell %s: %s' % (cell_id, str(exc)))
         results = {}
     
-    return results, errors
+    return chirp_features, errors
 
 def get_long_square_features(recordings, cell_id=''):
     errors = []
@@ -88,40 +80,7 @@ def get_long_square_features(recordings, cell_id=''):
     analysis_dict = lsa.as_dict(analysis)
     output = get_complete_long_square_features(analysis_dict) 
     
-    results = {
-        'rheobase': output.get('rheobase_i', np.nan) * 1e-12, #unscale from pA,
-        'fi_slope': output.get('fi_fit_slope', np.nan) * 1e-12, #unscale from pA,
-        'input_resistance': output.get('input_resistance', np.nan) * 1e6, #unscale from MOhm,
-        'input_resistance_ss': output.get('input_resistance_ss', np.nan) * 1e6, #unscale from MOhm,
-        'tau': output.get('tau', np.nan),
-        'sag': output.get('sag', np.nan),
-        'sag_peak_t': output.get('sag_peak_t', np.nan),
-        'sag_depol': output.get('sag_depol', np.nan),
-        'sag_peak_t_depol': output.get('sag_peak_t_depol', np.nan),
-        
-        'ap_upstroke_downstroke_ratio': output.get('upstroke_downstroke_ratio_hero', np.nan),
-        'ap_upstroke': output.get('upstroke_hero', np.nan) * 1e-3, #unscale from mV
-        'ap_downstroke': output.get('downstroke_hero', np.nan) * 1e-3, #unscale from mV
-        'ap_width': output.get('width_hero', np.nan),
-        'ap_threshold_v': output.get('threshold_v_hero', np.nan) * 1e-3, #unscale from mV
-        'ap_peak_deltav': output.get('peak_deltav_hero', np.nan) * 1e-3, #unscale from mV
-        'ap_fast_trough_deltav': output.get('fast_trough_deltav_hero', np.nan) * 1e-3, #unscale from mV
-
-        'firing_rate_rheo': output.get('avg_rate_rheo', np.nan),
-        'latency_rheo': output.get('latency_rheo', np.nan),
-        'firing_rate_40pa': output.get('avg_rate_hero', np.nan),
-        'latency_40pa': output.get('latency_hero', np.nan),
-        
-        'adaptation_index': output.get('adapt_mean', np.nan),
-        'isi_cv': output.get('isi_cv_mean', np.nan),
-
-        'isi_adapt_ratio': output.get('isi_adapt_ratio', np.nan),
-        'upstroke_adapt_ratio': output.get('upstroke_adapt_ratio', np.nan),
-        'downstroke_adapt_ratio': output.get('downstroke_adapt_ratio', np.nan),
-        'width_adapt_ratio': output.get('width_adapt_ratio', np.nan),
-        'threshold_v_adapt_ratio': output.get('threshold_v_adapt_ratio', np.nan),
-    }
-    return results, errors
+    return output, errors
 
 class MPSweep(Sweep):
     """Adapter for neuroanalysis.Recording => ipfx.Sweep
