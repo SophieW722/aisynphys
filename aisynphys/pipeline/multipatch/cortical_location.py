@@ -35,9 +35,8 @@ class CortexLocationPipelineModule(DatabasePipelineModule):
             assert len(images) > 0
             image_series_id = images[0].get('image_series')
             image_series_resolution = images[0].get('resolution')
-        except (AssertionError, ValueError):
-            errors.append("No LIMS image series found for slice.")
-            return errors
+        except (AssertionError, ValueError) as exc:
+            raise ValueError("No LIMS image series found for slice.") from exc
 
         try:
             lims_cell_cluster_id = expt.meta.get('lims_cell_cluster_id')
@@ -48,9 +47,8 @@ class CortexLocationPipelineModule(DatabasePipelineModule):
             soma_centers = {cell: coords for cell, coords in soma_centers.items() 
                             if all(coords) and cell in lims_ids}
             assert len(soma_centers) > 0
-        except (AssertionError, ValueError):
-            errors.append("No cell coordinates found for cell cluster.")
-            return errors
+        except (AssertionError, ValueError) as exc:
+            raise ValueError("No cell coordinates found for cell cluster.") from exc
         
         results, cell_errors = get_depths_slice(image_series_id, soma_centers,
                                                 species=slice_entry.species,
