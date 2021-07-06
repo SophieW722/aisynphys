@@ -6,9 +6,9 @@ cd neuroanalysis
 python setup.py develop
 
 cd ~
-git clone https://github.com/AllenInstitute/aisynphys --branch=release-2-pre-3 --recursive
+git clone https://github.com/AllenInstitute/aisynphys --branch=release-2-pre-4 --recursive
 cd aisynphys
 python setup.py develop
 
 # download and cache DB file
-python util/database.py --db-version=synphys_r2.0-pre3_small.sqlite
+python util/database.py --db-version=synphys_r2.0-pre4_small.sqlite
