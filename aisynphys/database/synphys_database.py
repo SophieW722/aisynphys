@@ -286,7 +286,7 @@ class SynphysDatabase(Database):
         if project_name is not None:
             names = [project_name] if isinstance(project_name, str) else project_name
             for name in names:
-                assert name in self.list_project_names(), "project_name '{name}' not found in database (see SynphysDatabase.list_project_names)".format(locals())
+                assert name in self.list_project_names(), "project_name %r not found in database (see SynphysDatabase.list_project_names)" % name
 
             if isinstance(project_name, str):
                 query = query.filter(self.Experiment.project_name==project_name)
