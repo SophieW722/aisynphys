@@ -52,18 +52,50 @@ if os.path.isfile(configfile):
 
 # intercept specific command line args
 parser = argparse.ArgumentParser(add_help=False)
-parser.add_argument('--db-version', default=None, dest='db_version', help="Name of a published DB version to use. Sqlite file will be downloaded if necessary. (see --list-db-versions)")
-parser.add_argument('--list-db-versions', default=False, action='store_true', dest='list_db_versions', help="Print the list of published DB versions and exit.")
-parser.add_argument('--db-host', default=None, dest='db_host', help="Database host string to use (e.g. 'postgresql://user:password@hostname' or 'sqlite:///')")
-parser.add_argument('--database', default=None, help="Name of postgres database or sqlite file to use")
+parser.add_argument(
+    '--db-version', default=None, dest='db_version',
+    help="Name of a published DB version to use. Sqlite file will be downloaded if necessary. (see --list-db-versions)")
+parser.add_argument(
+    '--list-db-versions', default=False, action='store_true', dest='list_db_versions',
+    help="Print the list of published DB versions and exit.")
+parser.add_argument(
+    '--db-host', default=None, dest='db_host',
+    help="Database host string to use (e.g. 'postgresql://user:password@hostname' or 'sqlite:///')")
+parser.add_argument(
+    '--database', default=None,
+    help="Name of postgres database or sqlite file to use")
 
 args, unknown_args = parser.parse_known_args()
 sys.argv = sys.argv[:1] + unknown_args
 
 if args.list_db_versions:
     from .synphys_cache import list_db_versions
-    for k in list_db_versions():
-        print("  ", k)
+    from .database import SynphysDatabase
+    supported = {}
+    unsupported = {}
+    for version, desc in list_db_versions().items():
+        if desc.get('schema_version') == SynphysDatabase.schema_version:
+            supported[version] = desc
+        else:
+            unsupported[version] = desc
+
+    print("\nThis version of aisynphys requires DB schema version ", SynphysDatabase.schema_version, '\n')
+    print("Supported DB files:                          Schema version:")
+    if len(supported) == 0:
+        print("  [  sorry: this version of aisynphys requires DB schema %s, but   ]"
+              "  [  no published DB files are available with this schema version  ]")
+    else:
+        for k,d in supported.items():
+            print("    %-40s   %s" % (k, d.get('schema_version', '?')))
+
+    print("Unsupported DB files:")
+    if len(unsupported) == 0:
+        print("  [  none found  ]")
+    else:
+        for k,d in unsupported.items():
+            print("    %-40s   %s" % (k, d.get('schema_version', '?')))
+
+
     sys.exit(0)
 
 
