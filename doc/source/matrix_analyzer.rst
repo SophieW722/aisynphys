@@ -16,7 +16,10 @@ Getting Started
 * Run the Matrix Analyzer in an Anaconda prompt::
 
     cd aisynphys
-    python tools\matrix_analyzer.py --db-version=synphys_r1.0_2019-08-29_small.sqlite
+    python tools\matrix_analyzer.py --db-version=small
+
+Using `--db-version=small` selects the most recent version of the published small database files.
+Try `--help` and `--list-db-versions` for other options.
 
 =========================
 About the Matrix Analyzer
