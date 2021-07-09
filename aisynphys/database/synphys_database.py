@@ -45,6 +45,9 @@ class SynphysDatabase(Database):
     @classmethod
     def list_current_versions(cls):
         """Return a dict of the most recent DB versions for each size.
+
+        If no published DB file is available for a particular size, then the value will be set to None
+        in the returned dictionary.
         """
         versions_available = list_db_versions()
         current_versions = {}

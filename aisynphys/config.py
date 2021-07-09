@@ -105,11 +105,11 @@ if args.list_db_versions:
 if args.db_version is not None:
     assert args.db_host is None, "Cannot specify --db-version and --db-host together"
     assert args.database is None, "Cannot specify --db-version and --database together"
+    from .database import SynphysDatabase, init_default_db
 
     if args.db_version in ('small', 'medium', 'full'):
-        from .database import SynphysDatabase
         current = SynphysDatabase.list_current_versions()
-        if args.db_version not in current:
+        if current[args.db_version] is None:
             print("No supported database found for requested size '%s' (use --list-db_versions to see currently supported files)" % args.db_version)
             sys.exit(-1)
         db_file = current[args.db_version]['db_file']
@@ -120,6 +120,9 @@ if args.db_version is not None:
     synphys_db_host = "sqlite:///"
     synphys_db_host_rw = None
     synphys_db = sqlite_file
+
+    # re-initialize default database
+    init_default_db()
     
 else:
     if args.db_host is not None:
