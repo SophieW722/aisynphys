@@ -15,7 +15,6 @@ class SynphysDatabase(Database):
     mouse_projects = ["mouse V1 coarse matrix", "mouse V1 pre-production"]
     human_projects = ["human coarse matrix"]
 
-
     @classmethod
     def load_sqlite(cls, sqlite_file, readonly=True):
         """Return a SynphysDatabase instance connected to an existing sqlite file.
@@ -37,18 +36,34 @@ class SynphysDatabase(Database):
             Must be one of 'small', 'medium', or 'full'.
         """
         assert db_size in ('small', 'medium', 'full'), "db_size argument must be one of 'small', 'medium', or 'full'"
+        current = cls.list_current_versions()
+        if db_size not in current:
+            raise Exception(f"This version of aisynphys requires database schema version {cls.schema_version}, "
+                            "but no released database files were found with this schema version.")
+        return cls.load_version(current[db_size])
+
+    @classmethod
+    def list_current_versions(cls):
+        """Return a dict of the most recent DB versions for each size.
+        """
         versions_available = list_db_versions()
-        supported = [name for name, desc in versions_available.items() if desc.get('schema_version') == cls.schema_version and f"_{db_size}.sqlite" in name]
-        if len(supported) == 0:
-            raise Exception(f"This version of aisynphys requires database schema version {cls.schema_version}, but no released database files were found with this schema version.")
-        current = sorted(supported)[-1]
-        return cls.load_version(current)
+        current_versions = {}
+        for size in ('small', 'medium', 'full'):
+            versions_with_size = [desc for desc in versions_available if desc['db_size'] == size and desc['schema_version'] == cls.schema_version]
+            if len(versions_with_size) == 0:
+                current_versions[size] = None
+            else:
+                current_versions[size] = versions_with_size[-1]
+
+        return current_versions
 
     @classmethod
     def list_versions(cls):
-        """Return a list of the available database versions.
+        """Return a list of all available database versions.
+
+        Each item in the list is a dictionary with keys db_file, release_version, db_size, and schema_version.
         """
-        return list(list_db_versions().keys())
+        return list_db_versions()
     
     @classmethod
     def load_version(cls, db_version):
@@ -61,8 +76,13 @@ class SynphysDatabase(Database):
 
             >>> from aisynphys.database import SynphysDatabase
             >>> SynphysDatabase.list_versions()
-            ['synphys_r1.0_2019-08-29_small.sqlite', 'synphys_r1.0_2019-08-29_medium.sqlite', 'synphys_r1.0_2019-08-29_full.sqlite']
-            >>> db = SynphysDatabase.load_version('synphys_r1.0_2019-08-29_small.sqlite')
+            [
+                {'db_file': 'synphys_r1.0_small.sqlite'},
+                {'db_file': 'synphys_r1.0_medium.sqlite'},
+                {'db_file': 'synphys_r1.0_full.sqlite'},
+                ...
+            ]
+            >>> db = SynphysDatabase.load_version('synphys_r1.0_small.sqlite')
             Downloading http://api.brain-map.org/api/v2/well_known_file_download/937779595 =>
               /home/luke/docs/aisynphys/doc/cache/database/synphys_r1.0_2019-08-29_small.sqlite
               [####################]  100.00% (73.13 MB / 73.1 MB)  4.040 MB/s  0:00:00 remaining
