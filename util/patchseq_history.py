@@ -36,13 +36,8 @@ def get_mapping_files(species='mouse'):
 
     return  mapping_files
 
-def build_tube_history(columns):
-    mapping_files = get_mapping_files(species='mouse')
-    mapping_files.update(get_mapping_files(species='human'))
-    patchseq_tubes = db.query(db.PatchSeq.tube_id).all()
-
+def compile_patchseq_history(mapping_files):
     result_merge = None
-    print('Constructing merged mapping history...')
     for map_date, map_file in mapping_files.items():
         open_file, local = tempfile.mkstemp(prefix='mapping_temp', suffix='.csv')
         shutil.copy(map_file, local)
@@ -64,8 +59,21 @@ def build_tube_history(columns):
     result_history = result_merge.copy()
     result_history.columns.names = ['map_date', 'features']
     dates = result_history.columns.get_level_values('map_date').to_list()
-    # result_history = result_history.rename(columns={date:date.to_pydatetime() for date in dates}, level='map_date')
     result_history=result_history.sort_index(axis=1,level=['map_date', 'features'], ascending=[True, True])
+
+    return result_history
+
+def build_tube_history(columns):
+    mouse_mapping_files = get_mapping_files(species='mouse')
+    human_mapping_files = (get_mapping_files(species='human'))
+    q = db.query(db.PatchSeq.tube_id, db.Slice.species)
+    q = q.join(db.Cell).join(db.Experiment).join(db.Slice)
+    patchseq_tubes = q.all()
+    
+    print('Constructing merged mapping history for mouse...')
+    mouse_result_history = compile_patchseq_history(mouse_mapping_files)
+    print('Constructing merged mapping history for human...')
+    human_result_history = compile_patchseq_history(human_mapping_files)
 
     print('Dropping patchseq_history table...')
     notes_db.db.drop_tables(tables=['patchseq_history'])
@@ -73,11 +81,18 @@ def build_tube_history(columns):
     notes_db.db.create_tables(tables=['patchseq_history'])
     print('Building history for %d tubes...' % len(patchseq_tubes))
     session = notes_db.db.session(readonly=False)
-    for i, tube_id in enumerate(patchseq_tubes):
-        tube_id = tube_id[0]
+    for i, tube in enumerate(patchseq_tubes):
+        tube_id, species = tube
         print('tube %d/%d: %s' % (i, len(patchseq_tubes), tube_id))
         if re.match(r'P(M|T|X)S4_(?P<date>\d{6})_(?P<tube_id>\d{3})_A01', tube_id) is None:
             print('\ttube name does not have proper format, carrying on...')
+            continue
+        if species == 'mouse':
+            result_history = mouse_result_history
+        elif species == 'human':
+            result_history = human_result_history
+        else:
+            print('Species %s does not match mouse or human' % species)
             continue
         if tube_id not in result_history.index:
             print('\ttube has no mapping results')
@@ -162,7 +177,17 @@ if __name__ == '__main__':
     if args.dbg is True:
         pg.dbg()
 
-    columns = ['sample_id', 'res_index', 'cluster_label', 'Tree_call', 'Tree_first_cl']
+    columns = [
+        'sample_id', 
+        'res_index', 
+        'cluster_label', 
+        'Tree_call', 
+        'Tree_first_cl',
+        'Tree_first_bt',
+        'Tree_first_KL',
+        'Tree_first_cor',
+        'Tree_second_bt',
+        ]
 
     if args.rebuild is True:
         if six.moves.input("Rebuild patchseq_history table? (y/n) ") != 'y':
