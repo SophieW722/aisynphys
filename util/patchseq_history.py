@@ -36,18 +36,24 @@ def get_mapping_files(species='mouse'):
 
     return  mapping_files
 
+def extract_data_from_file(map_file):
+    open_file, local = tempfile.mkstemp(prefix='mapping_temp', suffix='.csv')
+    shutil.copy(map_file, local)
+    results = pd.read_csv(local, header=0, index_col=False, dtype=object)
+    os.close(open_file)
+    os.remove(local)
+
+    if not all(x in results.columns for x in columns):
+        print('All data not present in mapping file, exiting')
+        return
+    return results
+
 def compile_patchseq_history(mapping_files):
     result_merge = None
     for map_date, map_file in mapping_files.items():
-        open_file, local = tempfile.mkstemp(prefix='mapping_temp', suffix='.csv')
-        shutil.copy(map_file, local)
-        results = pd.read_csv(local, header=0, index_col=False, dtype=object)
-        os.close(open_file)
-        os.remove(local)
-
-        if not all(x in results.columns for x in columns):
+        results = extract_data_from_file(map_file)
+        if results is None:
             continue
-
         current_results = {(map_date, feature): results[feature] for feature in columns}
         current_df = pd.DataFrame(current_results)
         current_df = current_df.set_index((map_date, 'sample_id')).rename_axis('sample_id', axis=0)
@@ -115,53 +121,74 @@ def build_tube_history(columns):
 
 def update_tube_history(columns, species='mouse'):
     mapping_files = get_mapping_files(species=species)
-    patchseq_tubes = db.query(db.PatchSeq.tube_id).all()
-
+    q = db.query(db.PatchSeq.tube_id)
+    q = q.join(db.Cell).join(db.Experiment).join(db.Slice)
+    q = q.filter(db.Slice.species==species)
+    patchseq_tubes = q.all()
     map_dates = sorted(mapping_files.keys())
-    #probably should change this to do a date match with the last date for each tube. In which case I can probably use the same build_history and just check that the date is in the keys
-    most_recent_date = map_dates[-1]
-    map_file = mapping_files[most_recent_date]
 
-    open_file, local = tempfile.mkstemp(prefix='mapping_temp', suffix='.csv')
-    shutil.copy(map_file, local)
-    results = pd.read_csv(local, header=0, index_col=False, dtype=object)
-    os.close(open_file)
-    os.remove(local)
-
-    if not all(x in results.columns for x in columns):
-        print('All data not present in mapping file, exiting')
-        return
-    results.set_index('sample_id', inplace=True)
     session = notes_db.db.session(readonly=False)
-    print('Building history for %d tubes...' % len(patchseq_tubes))
+    print('Updating history for %d tubes...' % len(patchseq_tubes))
+    new_tubes = []
     for i, tube_id in enumerate(patchseq_tubes):
         tube_id = tube_id[0]
         print('tube %d/%d: %s' % (i, len(patchseq_tubes), tube_id))
         if re.match(r'P(M|T)S4_(?P<date>\d{6})_(?P<tube_id>\d{3})_A01', tube_id) is None:
             print('\ttube name does not have proper format, carrying on...')
             continue
-        if tube_id not in results.index:
-            print('\ttube has no mapping results')
-            continue
-        tube_data = results.loc[tube_id][columns].to_dict()
+        # get date of last result for this tube
         try:
             tube_rec = notes_db.get_tube_history_record(tube_id, session=session)
         except Exception as e:
             print(e)
             continue
         if tube_rec is not None:
+            # Tube already in notes_db, just need to update it
             tube_notes = tube_rec.notes
-        else:
-            tube_rec = notes_db.PatchseqHistory(
-            tube_id=tube_id,
-            )
-            tube_notes = {}
-        tube_notes[most_recent_date] = tube_data
-        tube_rec.notes = tube_notes
-        tube_rec.modification_time = datetime.datetime.now()
-        session.commit()
-        print('\tupdated record')
+            most_recent_result = sorted(list(tube_notes.keys()))[-1]
+            results_to_update = {md: mapping_files[md] for md in map_dates if md > most_recent_result}
+            if len(results_to_update) == 0:
+                print('\thistory up to date')
+                continue
+            for map_date, map_file in results_to_update.items():
+                results = extract_data_from_file(map_file)
+                if results is None:
+                    continue
+                results.set_index('sample_id', inplace=True)
 
+                if tube_id not in results.index:
+                    print('\ttube has no mapping results')
+                    continue
+                tube_notes[map_date] = results.loc[tube_id][columns].to_dict()
+
+            tube_rec.notes = tube_notes
+            tube_rec.modification_time = datetime.datetime.now()
+            print('\tupdated record')
+        else:
+            print('\tnew tube')
+            new_tubes.append(tube_id)
+        
+    print('Adding new tubes')
+    result_history = compile_patchseq_history(mapping_files)
+    for i, tube_id in enumerate(new_tubes):
+        print('tube %d/%d: %s' % (i, len(new_tubes), tube_id))
+        if tube_id not in result_history.index:
+            print('\ttube has no mapping results')
+            continue
+        tube_data = pd.DataFrame(result_history.loc[tube_id]).reset_index()
+        tube_data = tube_data.pivot(index='map_date', columns='features', values=tube_id).dropna()
+        tube_notes = tube_data.to_dict('index')
+
+        tube_rec = notes_db.PatchseqHistory(
+            tube_id=tube_id,
+            notes=tube_notes,
+            modification_time=datetime.datetime.now(),
+        )
+
+        session.add(tube_rec)
+        print('\tadded record')
+            
+    session.commit()
     session.close()
     print('Done!')
 
