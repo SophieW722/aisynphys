@@ -653,6 +653,35 @@ def all_cell_layers():
     recs = query(q)
     return recs
 
+def query_for_layer_polygons(
+    focal_plane_image_series_id):
+    """ Get all layer polygons for this image series
+    """
+
+    q = f"""
+        select distinct
+            st.acronym as name,
+            polygon.path as path,
+            sc.resolution as resolution
+        from specimens sp
+        join specimens spp on spp.id = sp.parent_id
+        join image_series imser on imser.specimen_id = spp.id
+        join sub_images si on si.image_series_id = imser.id
+        join images im on im.id = si.image_id
+        join slides s on s.id=im.slide_id
+        join scans sc on sc.slide_id=s.id
+        join treatments tm on tm.id = im.treatment_id
+        join avg_graphic_objects layer on layer.sub_image_id = si.id
+        join avg_group_labels label on label.id = layer.group_label_id
+        join avg_graphic_objects polygon on polygon.parent_id = layer.id
+        join structures st on st.id = polygon.cortex_layer_id
+        where
+            imser.id = {focal_plane_image_series_id}
+            and label.name in ('Cortical Layers')
+            and tm.name = 'Biocytin' -- the polys are duplicated between 'Biocytin' and 'DAPI' images. Need only one of these
+        """
+    return query(q)
+
 if __name__ == '__main__':
     # testing specimen
     spec_name = "Ntsr1-Cre_GN220;Ai14-349905.03.06"
