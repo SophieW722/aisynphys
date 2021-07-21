@@ -5,15 +5,41 @@ from .util.download import interactive_download
 
 _db_versions = None
 def list_db_versions():
-    """Return a dictionary listing database versions that are available for download.
+    """Return a list of database versions that are available for download, sorted by release version.
+
+    Each item in the list is a dictionary with keys db_file, release_version, db_size, and schema_version.
     """
     global _db_versions
-    if _db_versions is None:
-        # DB urls are stored as a base64-encoded pickle on GitHub.
-        # This allows us to change download URLs without requiring users to pull new code.
-        # The b64 encoding is just intended to prevent bots scraping our URLs
-        b64_urls = urllib.request.urlopen('https://raw.githubusercontent.com/AllenInstitute/aisynphys/download_urls/download_urls').read()
-        _db_versions = pickle.loads(base64.b64decode(b64_urls))
+    if _db_versions is not None:
+        return _db_versions
+
+    # DB urls are stored as a base64-encoded pickle on GitHub.
+    # This allows us to change download URLs without requiring users to pull new code.
+    # The b64 encoding is just intended to prevent bots scraping our URLs
+    b64_urls = urllib.request.urlopen('https://raw.githubusercontent.com/AllenInstitute/aisynphys/download_urls/download_urls').read()
+    version_info = pickle.loads(base64.b64decode(b64_urls))
+
+    # parse version and size information from file names
+    _db_versions = []
+    for name,desc in version_info.items():
+        # accepted formats are "synphys_rX.Y_size.sqlite" or "synphys_rX.Y-preZ_size.sqlite"
+        #   .. although we do handle one older filename
+        m = re.match('synphys_r(\d+\.\d+(-pre\d+)?)(_2019-08-29)?_(small|medium|full).sqlite', name)
+        assert m is not None, "unsupported DB file name: " + name
+        desc['db_file'] = name
+        desc['release_version'] = m.groups()[0]
+        desc['db_size'] = m.groups()[3]
+        _db_versions.append(desc)
+
+    def version_value(desc):
+        m = re.match(r'(\d+)\.(\d+)(-pre(\d+))?', desc['release_version'])
+        major, minor, _, pre = m.groups()
+        val = int(major) * 1e9 + int(minor) * 1e6
+        if pre is not None:
+            val = (val - 1000) + int(pre)
+        return val
+    _db_versions.sort(key=version_value)
+
     return _db_versions
 
 
