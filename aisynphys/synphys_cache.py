@@ -55,9 +55,9 @@ def get_db_path(db_version):
     if not os.path.exists(cache_path):
         os.makedirs(cache_path)
     if not os.path.exists(cache_file):
-        versions = list_db_versions()
+        versions = {v['db_file']:v for v in list_db_versions()}
         if db_version not in versions:
-            raise KeyError("Unknown database version; options are: %s" % str(list(versions.keys())))
+            raise KeyError("Unknown database version %r; options are: %s" % (db_version, str(list(versions.keys()))))
         url = versions[db_version]['url']
         interactive_download(url, cache_file)
         
