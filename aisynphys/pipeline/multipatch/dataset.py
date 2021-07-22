@@ -205,7 +205,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
             mpa = MultiPatchSyncRecAnalyzer(srec)
             for pre_dev in srec.devices:
                 for post_dev in srec.devices:
-                    if pre_dev == post_dev:
+                    if pre_dev == post_dev or pre_dev not in all_pulse_entries:
                         continue
 
                     # get all responses, regardless of the presence of a spike
