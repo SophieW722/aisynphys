@@ -274,7 +274,7 @@ def generate_connectivity_matrix(db, cell_classes, pair_query_args, ax):
     norm = matplotlib.colors.LogNorm(vmin=0.01, vmax=1.0, clip=True)
     cmap = matplotlib.cm.get_cmap('plasma')    
 
-    class_labels = {x:x for x in cell_classes.keys()}
+    class_labels = {cls:name for name,cls in cell_classes.items()}
 
     # finally, draw the colormap using the provided function:
     im, cbar, labels = show_connectivity_matrix(
@@ -296,18 +296,16 @@ def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_
         #                                     name                                  unit   scale alpha  db columns                                         colormap       log     clim           text format
         'psp_amplitude':                      ('PSP Amplitude',                     'mV',  1e3,  1,     [db.Synapse.psp_amplitude],                        'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
         'psp_rise_time':                      ('PSP Rise Time',                     'ms',  1e3,  0.5,   [db.Synapse.psp_rise_time],                        'viridis_r',   True,   (1, 10),       "%0.2f\nms"),
-        'psp_decay_tau':                      ('PSP Decay Tau',                     'ms',  1e3,  0.01,  [db.Synapse.psp_decay_tau],                        'viridis_r',   True,   (1, 200),      "%0.1f\nms"),
+        'psp_decay_tau':                      ('PSP Decay Tau',                     'ms',  1e3,  0.01,  [db.Synapse.psp_decay_tau],                        'viridis_r',   True,   (10, 200),      "%0.1f\nms"),
         'psc_amplitude':                      ('PSC Amplitude',                     'pA',  1e12, 0.3,   [db.Synapse.psc_amplitude],                        'bwr',         False,  (-20, 20),     "%0.2g pA"),
         'psc_rise_time':                      ('PSC Rise Time',                     'ms',  1e3,  1,     [db.Synapse.psc_rise_time],                        'viridis_r',   True,   (.1, 6),       "%0.2f ms"),
         'psc_decay_tau':                      ('PSC Decay Tau',                     'ms',  1e3,  1,     [db.Synapse.psc_decay_tau],                        'viridis_r',   True,   (2, 20),       "%0.1f\nms"),
         'latency':                            ('Latency',                           'ms',  1e3,  1,     [db.Synapse.latency],                              'viridis_r',   True,   (0.5, 3),      "%0.2f\nms"),
         'pulse_amp_90th_percentile':          ('PSP Amplitude 90th %%ile',          'mV',  1e3,  1.5,   [db.Dynamics.pulse_amp_90th_percentile],           'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
-        'junctional_conductance':             ('Junctional Conductance',            'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],           'viridis',     False,  (0, 10),       "%0.2f nS"),
-        'coupling_coeff_pulse':               ('Coupling Coefficient',              '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],             'viridis',     False,  (0, 1),        "%0.2f"),
         'stp_initial_50hz':                   ('Paired pulse STP',                  '',    1,    1,     [db.Dynamics.stp_initial_50hz],                    'bwr',         False,  (-0.5, 0.5),   "%0.2f"),
-        'stp_induction_50hz':                 ('← Facilitating  Depressing →',      '',    1,    1,     [db.Dynamics.stp_induction_50hz],                  'bwr',         False,  (-0.5, 0.5),   "%0.2f"),
-        'stp_recovery_250ms':                 ('← Over-recovered  Not recovered →', '',    1,    1,     [db.Dynamics.stp_recovery_250ms],                  'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
-        'stp_recovery_single_250ms':          ('← Over-recovered  Not recovered →', '',    1,    1,     [db.Dynamics.stp_recovery_single_250ms],           'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'stp_induction_50hz':                 ('Facilitation / depression',         '',    1,    1,     [db.Dynamics.stp_induction_50hz],                  'bwr',         False,  (-0.5, 0.5),   "%0.2f"),
+        'stp_recovery_250ms':                 ('STP Recovery',                      '',    1,    1,     [db.Dynamics.stp_recovery_250ms],                  'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'stp_recovery_single_250ms':          ('STP Recovery',                      '',    1,    1,     [db.Dynamics.stp_recovery_single_250ms],           'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
         'pulse_amp_first_50hz':               ('1st PSP Amplitude @ 50Hz',          '',    1e3,  1,     [db.Dynamics.pulse_amp_first_50hz],                'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
         'pulse_amp_stp_initial_50hz':         ('2nd PSP Amplitude @ 50Hz',          '',    1e3,  1,     [db.Dynamics.pulse_amp_stp_initial_50hz],          'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
         'pulse_amp_stp_induction_50hz':       ('PSP Amplitude STP induced @ 50Hz',  '',    1e3,  1,     [db.Dynamics.pulse_amp_stp_induction_50hz],        'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
