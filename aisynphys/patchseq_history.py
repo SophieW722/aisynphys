@@ -90,18 +90,3 @@ def get_patchseq_history(columns=COLUMNS, species='mouse'):
     tube_history = result_history[result_history.index.isin(patchseq_tubes)] 
     print('Done!')
     return tube_history
-
-
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--species', type=str, default='mouse')
-    parser.add_argument('--dbg', default=False, action='store_true')
-
-    args = parser.parse_args(sys.argv[1:])
-
-    if args.dbg is True:
-        pg.dbg()
-
-    
-
-    get_patchseq_history(columns, species=args.species)
