@@ -22,6 +22,12 @@ PairNotes = make_table(
     ormbase=DataNotesORMBase,
 )
 
+if config.synphys_db_host is None:
+    db = NoDatabase("Cannot access data_notes; no DB specified in config.synphys_db_host")
+else:
+    db = Database(config.synphys_db_host, config.synphys_db_host_rw, "data_notes", DataNotesORMBase)
+
+
 def get_pair_notes_record(expt_id, pre_cell_id, post_cell_id, session=None):
     if session is None:
         session = db.default_session
