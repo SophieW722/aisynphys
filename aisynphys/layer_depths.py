@@ -189,12 +189,12 @@ def get_depths_slice(focal_plane_image_series_id, soma_centers, species,
 
     layers, pia_path, wm_path = layer_info_from_snap_polygons_output(output, resolution)
     try:
-        if not (pia_path & wm_path):
+        if (pia_path is None) or (wm_path is None):
             top_path, bottom_path, pia_extra_dist, wm_extra_dist = get_missing_layer_info(layers, species)
-        if pia_path:
+        if pia_path is not None:
             top_path = pia_path
             pia_extra_dist = 0
-        if wm_path:
+        if wm_path is not None:
             bottom_path = wm_path
             wm_extra_dist = 0
         top_path = resample_line(top_path)
