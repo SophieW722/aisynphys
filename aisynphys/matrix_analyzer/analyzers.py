@@ -1113,6 +1113,7 @@ class CellAnalyzer(pg.QtCore.QObject):
             ('mapped_subclass', {'mode': 'enum'}),
             ('cluster_label', {'mode': 'enum'}),
             ('top_leaf', {'mode': 'enum'}),
+            ('batch', {'mode': 'enum'}),
         ]
 
 

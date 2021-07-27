@@ -160,6 +160,15 @@ class CellBase(object):
 
         return tms_class, tm_class
 
+    @property
+    def pairs(self):
+        cell_pairs = {}
+        expt_pairs = self.experiment.pair_list
+        for pair in expt_pairs:
+            if self.ext_id in [pair.pre_cell.ext_id, pair.post_cell.ext_id]:
+                cell_pairs[(pair.pre_cell.ext_id, pair.post_cell.ext_id)] = pair
+        return cell_pairs
+
 
 Cell = make_table(
     name='cell', 
@@ -197,6 +206,7 @@ class PairBase(object):
         if uid is None or uid == '':
             uid = str('%0.3f'%self.experiment.acq_timestamp if self.experiment.acq_timestamp is not None else None)
         return "<%s %s %s %s>" % (self.__class__.__name__, uid, self.pre_cell.ext_id, self.post_cell.ext_id)
+
 
 Pair = make_table(
     name='pair',
