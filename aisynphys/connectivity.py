@@ -14,6 +14,9 @@ def connectivity_profile(connected, distance, bin_edges):
     """
     Compute connection probability vs distance with confidence intervals.
 
+    Connections are binned by distance and the connected proportion in each bin is returned along with
+    the binomial confidence intervals. 
+
     Parameters
     ----------
     connected : boolean array
@@ -133,8 +136,8 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
         ConnectivityModel subclass to fit Cp vs distance profile. If combined with
         sigma the fit will be fixed to that sigma. If None, then fit results
         are ommitted from the results
-    correction_model: ConnectivityModel | None
-        ConnectivityModel subclass used to correct fit_model based on other metrics 
+    correction_model: CorrectionModel | None
+        CorrectionModel subclass used to correct fit_model based on other metrics 
         which are set within ConnectivityModel.variables
     dist_measure : str
         Which distance measure to use when calculating connection probability.
@@ -155,37 +158,13 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
     for key, class_pairs in pair_groups.items():
         pre_class, post_class = key
         
-        probed_pairs = [p for p in class_pairs if pair_was_probed(p, pre_class.output_synapse_type)]
-        connections_found = [p for p in probed_pairs if p.has_synapse]
+        class_results = get_cp_results(class_pairs, alpha=alpha)
+        results[(pre_class, post_class)] = class_results
         
-        gaps_probed = [p for p in class_pairs if pair_probed_gj(p)]
-        gaps_found = [p for p in gaps_probed if p.has_electrical]
-
-        n_connected = len(connections_found)
-        n_probed = len(probed_pairs)
-        n_gaps_probed = len(gaps_probed)
-        n_gaps = len(gaps_found)
-        conf_interval_cp = connection_probability_ci(n_connected, n_probed, alpha=alpha)
-        conn_prob = float('nan') if n_probed == 0 else n_connected / n_probed
-        conf_interval_gap = connection_probability_ci(n_gaps, n_gaps_probed, alpha=alpha)
-        gap_prob = float('nan') if n_gaps_probed == 0 else n_gaps / n_gaps_probed
-
-        results[(pre_class, post_class)] = {
-            'n_probed': n_probed,
-            'n_connected': n_connected,
-            'n_gaps_probed': n_gaps_probed,
-            'n_gaps': n_gaps,
-            'connection_probability': (conn_prob,) + conf_interval_cp,
-            'gap_probability': (gap_prob,) + conf_interval_gap,
-            'connected_pairs': connections_found,
-            'gap_pairs': gaps_found,
-            'probed_pairs': probed_pairs,
-        }
-
-        distances = np.array([getattr(p, dist_measure) for p in probed_pairs], dtype=float)
-        connections = np.array([p.synapse for p in probed_pairs], dtype=bool)
-        gap_distances = np.array([getattr(p, dist_measure) for p in gaps_probed], dtype=float)
-        gaps = np.array([p.has_electrical for p in gaps_probed], dtype=bool)
+        distances = np.array([getattr(p, dist_measure) for p in class_results['probed_pairs']], dtype=float)
+        connections = np.array([p.synapse for p in class_results['probed_pairs']], dtype=bool)
+        gap_distances = np.array([getattr(p, dist_measure) for p in class_results['gaps_probed']], dtype=float)
+        gaps = np.array([p.has_electrical for p in class_results['gaps_probed']], dtype=bool)
         mask = np.isfinite(distances) & np.isfinite(connections)
         results[(pre_class, post_class)]['probed_distances'] = distances[mask]
         results[(pre_class, post_class)]['connected_distances'] = connections[mask]
@@ -204,25 +183,12 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
             adj_gap_junc, adj_lower_gj_ci, adj_upper_gj_ci = distance_adjusted_connectivity(gap_distances[mask2], gaps[mask2], sigma=sigma, alpha=alpha)
             results[(pre_class, post_class)]['adjusted_gap_junction'] = (adj_gap_junc, adj_lower_gj_ci, adj_upper_gj_ci)
         if correction_model is not None:
-            # Here it performs corrected p_max fit if there are relevant variables.
-            if hasattr(correction_model, 'correction_variables'): # correction model.
-                correction_model.size = sigma # override it
-                variables = [distances[mask]]
-                for variable in correction_model.correction_variables:
-                    var_extract = np.array([getattr(p, variable) for p in probed_pairs], dtype=float)
-                    variables.append(var_extract[mask])
-                if len(class_pairs) == 0: # empty list
-                    excinh = 0 # doesn't matter which, so give exc.
-                elif class_pairs[0].pre_cell.cell_class_nonsynaptic == 'ex':
-                    excinh = 0
-                else:
-                    excinh = 1
-
-                corr_fit = correction_model.fit(correction_model, variables, connections[mask], excinh=excinh)
-                if mask.sum() == 0: # no probing
-                    corr_fit.x = np.nan # needed not to report the initial value
-                results[(pre_class, post_class)]['connectivity_correction_fit'] = corr_fit
-                # for gap junctions, this analysis won't be relevant, so I won't assign gap_fit for now.              
+            # TODO: if a different correction_model needs to be supplied for different
+            # cell types, it will be here.
+            # UPDATE 7/28/21: Current implementation is to do this outside of this function using component functions that have been added here
+            # arguably now there should not be a fit_model and and correction_model
+            results[(pre_class, post_class)]['connectivity_correction_fit'] = adjust_cp(class_results['probed_pairs'], correction_model)
+            
     
     return results
 
@@ -577,87 +543,161 @@ class GaussianModel(ConnectivityModel):
     def connection_probability(self, x):
         return self.pmax * np.exp(-x**2 / (2 * self.size**2))
 
+    @staticmethod
+    def correction_func(params, x):
+        return np.exp(-x**2 / (2 * params[1]**2))
+
 
 class CorrectionModel(ConnectivityModel):
     """ Connectivity model with corrections for potential biases
-    Gaussian is used for distance-adjustment.
 
     Parameters
     ----------
     pmax : float
         Maximum connection probability (at 0 intersomatic distance)
-    size : float
-        Gaussian sigma for distance-adjustment
     correction_variables : list of strings
         Names of correction variables.
         These names should be defined in each Pair in pair_groups when measure_connectivity is called.
     correction_functions : list of functions
         Functions used to correct estimating connection probability.
         The following formats need to be valid to execute properly.
-        correction_functions[i](correction_parameters[excinh][i], pair[correction_variables[i]])
+        correction_functions[i](correction_parameters[i], pair[correction_variables[i]])
         where is a Pair instance in pair_group (1st argument of measure_connectivity)
     correction_parameters : list of list of [array or [list of float]]
         Parameters used aside with correction_variables. Fixed during the fit.
         The first index is 0 (pre-synaptic excitatory) or 1 (pre-synaptic inhibitory)
-        
+    do_minos : bool
+        Use MINOS algorithm for estimating the 95% confidence interval (default: True).
+        If False, it uses the same approximation method used for the distance adjustment.
+
     Note: correction_variables, correction_parameters, and correction_functions should have the same lengths.
     """
-    def __init__(self, pmax, size, correction_variables, correction_functions, correction_parameters, do_minos=True):
+    def __init__(self, pmax, correction_variables, correction_functions, correction_parameters, do_minos=True):
         self.pmax = pmax
-        self.size = size
-        self.correction_variables = correction_variables # list of strings (names of correction variables)
-        self.correction_functions = correction_functions # list of functions
-        self.correction_parameters = correction_parameters # list of list of parameters for correction functions
+        self.correction_variables = correction_variables  # list of strings (names of correction variables)
+        self.correction_functions = correction_functions  # list of functions
+        self.correction_parameters = correction_parameters  # list of list of parameters for correction functions
         self.do_minos = do_minos
-
-    def dist_gaussian(self, p_sigma, v_dist):
-        return (np.exp(-1.0 * v_dist ** 2 / (2.0 * p_sigma ** 2)))
 
     def connection_probability(self, x):
         # x is expected to be [distance, correction_var1, correction_var2,...].
         # the final probability is modeled as a product of multiple corrections.
-        distancepart = self.dist_gaussian(self.size, x[0])
         correction = 1.0
-        for i in range(1, len(x)):
+        for i in range(len(x)):
             # replace None with nan to make the following code to work
-            v = [np.nan if el is None else el for el in x[i]]
-            corrval = self.correction_functions[i-1](self.correction_parameters[self.excinh][i-1], v)
+            v = np.array([np.nan if el is None else el for el in x[i]])
+            corrval = self.correction_functions[i](self.correction_parameters[i], v)
             correction *= np.nan_to_num(corrval, nan=1.0)
-        return np.clip(self.pmax * distancepart * correction, 0.0, 1.0)
+        return np.clip(self.pmax * correction, 0.0, 1.0)
 
-    @classmethod
-    def nll(cls, pmax, inst, x, conn):
-        inst.pmax = pmax # override existing value
-        return -inst.likelihood(x, conn)
+    def nll(self, pmax, x, conn):
+        self.pmax = pmax  # override existing value
+        return -self.likelihood(x, conn)
 
-    @classmethod
-    def fit(cls, inst, x, conn, init=(0.1), bounds=((0.0, 3.0)), excinh=None, **kwds):
-        inst.excinh = excinh # setting the cell class...
+    def fit(self, x, conn, init=(0.1), bounds=((0.0, 3.0)), **kwds):
         fit = iminuit.minimize(
-                        cls.nll,
-                        x0=init, 
-                        args=(inst, x, conn),
-                        bounds=bounds,
-                        **kwds,
-                    )
-        cp = np.nan if len(conn) == 0 else fit.x
+            self.nll,
+            x0=init,
+            args=(x, conn),
+            bounds=bounds,
+            **kwds,
+        )
 
-        # to calculate CI, get the adjustment values from the instance.
-        inst.pmax = 1.0
-        mean_adjustment = inst.connection_probability(x).mean()
+        if len(conn) == 0:
+            fit.cp_ci = (np.nan, np.nan, np.nan)
+            return fit
 
-        n_conn = conn.sum()
-        n_test = len(conn)
-        est_pmax = (n_conn / n_test) / mean_adjustment
-    
-        # and for the CI, we can just use a standard binomial confidence interval scaled by the same factor
-        lower, upper = connection_probability_ci(n_conn, n_test)
+        cp = fit.x[0]
+        import pdb
 
-        lower = lower / mean_adjustment - est_pmax + cp
-        upper = upper / mean_adjustment - est_pmax + cp
+        if self.do_minos:  # MINOS (Likelihood-based CI estimation)
+            # do minuit calculation
+            cl = 0.95
+
+            try:
+                fit.minuit.minos(cl=cl)
+            except RuntimeError as e:  # Catch RuntimeError from iminuit
+                if conn.sum() == 0:
+                    # zero connection case. special treatment
+                    fit.x = 0
+                    lower, upper = manual_ci_search(fit, cl, zero_connection=True)
+                    fit.cp_ci = (cp, lower, upper)
+                    pdb.set_trace()
+                    return fit
+                else:
+                    lower, upper = manual_ci_search(fit, cl)
+                    fit.cp_ci = (cp, lower, upper)
+                    print(e)
+                    return fit
+            except Exception as e:
+                # re-raise if unexpected exception is observed
+                print(e)
+                raise e
+
+            cp = fit.minuit.params['x0'].value
+            lower = cp + fit.minuit.merrors['x0'].lower
+            upper = cp + fit.minuit.merrors['x0'].upper
+            if not fit.minuit.merrors['x0'].is_valid:
+                # do it once more (sometimes helps)
+                fit.minuit.minos(cl=cl)
+                if not fit.minuit.merrors['x0'].is_valid:
+                    # it it doesn't work, manually search the value
+                    lower, upper = manual_ci_search(fit, cl)
+
+        else:  # Approximation method
+            self.pmax = 1.0
+            mean_adjustment = self.connection_probability(x).mean()
+            # to calculate CI, get the adjustment values from the instance.
+            n_conn = conn.sum()
+            n_test = len(conn)
+            est_pmax = (n_conn / n_test) / mean_adjustment
+
+            # and for the CI, we can just use a standard binomial confidence interval scaled by the same factor
+            lower, upper = connection_probability_ci(n_conn, n_test)
+
+            lower = lower / mean_adjustment
+            upper = upper / mean_adjustment
+            fit.cp_ci = (est_pmax, lower, upper)
 
         fit.cp_ci = (cp, lower, upper)
+
         return fit
+
+
+def manual_ci_search(fit, cl, zero_connection=False):
+    """Return confidence intervals on the probability of connectivity, given the
+    failed execution of the minuit fit.
+
+    Parameters
+    ----------
+    fit : Minuit
+        Result of the fit returned by iminuit
+    cl : float
+        Confidence level for the CI estimate
+    zero_connection : bool
+        If true, set return 0 as the lower CI bound, and only evaluate the upper CI bound
+
+    Returns
+    -------
+    lower : float
+        The lower confidence interval
+    upper : float
+        The upper confidence interval
+    """
+    from scipy.stats import chi2
+    factor = chi2(1).ppf(cl)
+
+    def fitfun(x):
+        return (fit.minuit.fcn([x]) - fit.minuit.fcn([fit.x]) - factor * fit.minuit.errordef)**2
+
+    if zero_connection:
+        lower = 0.0
+        upper = iminuit.minimize(fitfun, 0.001, bounds=[[fit.x, 5]])
+        return (lower, upper.x)
+    else:
+        lower = iminuit.minimize(fitfun, fit.x * 0.9, bounds=[[0, fit.x]])
+        upper = iminuit.minimize(fitfun, fit.x * 1.1, bounds=[[fit.x, 5]])
+        return (lower.x, upper.x)
 
 
 class ErfModel(ConnectivityModel):
@@ -684,9 +724,9 @@ class ErfModel(ConnectivityModel):
         self.pmax = pmax
         self.size = size
         self.midpoint = midpoint
-    
+
     def connection_probability(self, x):
-        return self.pmax / 2.0 * (1.0 + erf((x - self.midpoint) / (np.sqrt(2) * self.size)))
+        return self.pmax * 0.5 * (1.0 + erf((x - self.midpoint) / (np.sqrt(2) * self.size)))
 
     @staticmethod
     def correction_func(params, x):
@@ -695,7 +735,7 @@ class ErfModel(ConnectivityModel):
     @classmethod
     def fit(cls, x, conn, init, bounds, constraint=None, fixed_size=False, fixed_max=False):
         # constraint should be a 2-element tuple with (sigma_multiplier, stop_point)
-        if constraint == None:
+        if constraint is None:
             fit = iminuit.minimize(
                 cls.err_fn,
                 x0=init,
@@ -707,7 +747,7 @@ class ErfModel(ConnectivityModel):
             # to make it quartile of the detection power, use the following parameters
             # constraint[0] == 0.6745 (specify quartile point using sigma)
             # constraint[1] == 4.5655 observed value in the data (may change if the data change)
-            con_array = np.array([[0, constraint[0], 1]]) # 1 x 3 matrix
+            con_array = np.array([[0, constraint[0], 1]])  # 1 x 3 matrix
             constraints = scipy.optimize.LinearConstraint(con_array, lb=-np.inf, ub=constraint[1])
             fit = scipy.optimize.minimize(
                 cls.err_fn,
@@ -738,7 +778,7 @@ class BinaryModel(ConnectivityModel):
         self.pmax = pmax
         self.size = size
         self.adjustment = adjustment
-    
+
     def connection_probability(self, x):
         val = np.ones_like(x)
         val[x < self.size] *= self.adjustment
@@ -854,6 +894,7 @@ def recip_connectivity_profile(probes_1, probes_2, bin_edges):
 
 
 class CorrectionMetricFunctions:
+    @staticmethod
     def pre_axon_length(pair):
         cell_morph = pair.pre_cell.morphology
         if cell_morph is None:
@@ -863,6 +904,7 @@ class CorrectionMetricFunctions:
         elif cell_morph.axon_truncation == 'intact':
             return 200e-6
 
+    @staticmethod
     def avg_pair_depth(pair):
         if pair.pre_cell.depth is None or pair.post_cell.depth is None:
             return np.nan
@@ -871,6 +913,7 @@ class CorrectionMetricFunctions:
             return np.nan
         return avg_depth
 
+    @staticmethod
     def n_test_spikes(pair):
         syn_type = pair.pre_cell.cell_class_nonsynaptic
         if syn_type not in ['ex', 'in']:
@@ -881,6 +924,7 @@ class CorrectionMetricFunctions:
         n_spikes = n_spikes if n_spikes <= 800 else 800
         return n_spikes            
 
+    @staticmethod
     def baseline_rms_noise(pair):
         post_cell = pair.post_cell
         q = db.query(db.PatchClampRecording)
@@ -893,6 +937,7 @@ class CorrectionMetricFunctions:
         else:
             return np.nan
 
+    @staticmethod
     def detection_power(pair):
         n_spikes = CorrectionMetricFunctions.n_test_spikes(pair)
         baseline_noise = CorrectionMetricFunctions.baseline_rms_noise(pair)
@@ -905,37 +950,85 @@ class CorrectionMetricFunctions:
         else:
             return np.nan
 
+def get_cp_results(pairs, alpha=0.5):
+    probed_pairs = [p for p in pairs if pair_was_probed(p, p.pre_cell.cell_class_nonsynaptic)]
+    connections_found = [p for p in probed_pairs if p.has_synapse]
 
-def get_cp_results():
-    # reminder stub: when merging full_submission branch, take care of 
-    # remaining issues in https://github.com/AllenInstitute/aisynphys/pull/121
-    pass
+    gaps_probed = [p for p in pairs if pair_probed_gj(p)]
+    gaps_found = [p for p in gaps_probed if p.has_electrical]
 
+    n_connected = len(connections_found)
+    n_probed = len(probed_pairs)
+    n_gaps_probed = len(gaps_probed)
+    n_gaps = len(gaps_found)
+    conf_interval_cp = connection_probability_ci(n_connected, n_probed, alpha=alpha)
+    conn_prob = float('nan') if n_probed == 0 else n_connected / n_probed
+    conf_interval_gap = connection_probability_ci(n_gaps, n_gaps_probed, alpha=alpha)
+    gap_prob = float('nan') if n_gaps_probed == 0 else n_gaps / n_gaps_probed
 
-def ei_correct_connectivity(ei_classes, correction_metrics, pairs):
+    results = {
+        'n_probed': n_probed,
+        'n_connected': n_connected,
+        'n_gaps_probed': n_gaps_probed,
+        'n_gaps': n_gaps,
+        'connection_probability': (conn_prob,) + conf_interval_cp,
+        'gap_probability': (gap_prob,) + conf_interval_gap,
+        'connected_pairs': connections_found,
+        'gap_pairs': gaps_found,
+        'probed_pairs': probed_pairs,
+    }
+        
+    return results
+
+def fit_cp(probed_pairs, fit_metric='lateral_distance', fit_model=GaussianModel, fit_opts={}):
+    metric = np.array([getattr(p, fit_metric) for p in probed_pairs], dtype=float)
+    connections = np.array([p.synapse for p in probed_pairs], dtype=bool)
+    mask = np.isfinite(metric) & np.isfinite(connections)
+    fit = fit_model.fit(metric[mask], connections[mask], **fit_opts)
+    
+    return fit
+
+def adjust_cp(probed_pairs, correction_model):
+    
+    assert hasattr(correction_model, 'correction_variables'), "CorrectionModel needs to have the 'correction_variables' attribute."
+    
+    connections = np.array([p.synapse for p in probed_pairs], dtype=bool)
+    mask = np.isfinite(connections)
+    variables = []
+    for variable in correction_model.correction_variables:
+        var_extract = np.array([getattr(p, variable) for p in probed_pairs], dtype=float)
+        # mask = mask & np.isfinite(var_extract)
+        variables.append(var_extract)
+    
+    corr_fit = correction_model.fit([v[mask] for v in variables], connections[mask])
+    if mask.sum() == 0: # no probing
+        corr_fit.x = np.nan # needed not to report the initial value
+    
+    return corr_fit
+
+def get_correction_model(probed_pairs, correction_metrics, pmax=0.1):
     # correction_metrics is a dictionary where the key is the name of the metric which corresponds to either a column in the 
     # SynPhys DB or is a callable function and the values are a dictionary identifying the fit model and any associated parameters
-    
-    correction_fits = {}
-    for class_name, cell_class in ei_classes.items():
 
-        class_pairs = [p for p in pairs if p.pre_cell.cell_class_nonsynaptic==cell_class.name]
+    connections = np.array([p.has_synapse for p in probed_pairs], dtype=bool)
+    corr_model = {}
+    correction_fits = []
+    correction_parameters = []
+    correction_functions = []
+    for metric, opts in correction_metrics.items():
+        pair_metric = np.array([getattr(p, metric) for p in probed_pairs], dtype=float)    
+        mask = np.isfinite(pair_metric) & np.isfinite(connections)
+        model = opts['model']
+        model_opts = opts['model_opts']
 
-        probed_pairs = [p for p in class_pairs if pair_was_probed(p, cell_class.output_synapse_type)]
-        connections = np.array([p.has_synapse for p in probed_pairs], dtype=bool)
+        metric_fit = model.fit(pair_metric[mask], connections[mask], **model_opts)
+        metric_corr_model = CorrectionModel(pmax, [metric], [model.correction_func], [metric_fit.fit_result.x])
+        corr_model[metric] = metric_corr_model
+        
+        correction_fits.append(metric_fit)
+        correction_parameters.append(metric_fit.fit_result.x)
+        correction_functions.append(model.correction_func)
 
-        correction_fits[class_name] = []
-        for metric, opts in correction_metrics.items():
-            pair_metric = np.array([getattr(p, metric) for p in probed_pairs], dtype=float)    
-            mask = np.isfinite(pair_metric) & np.isfinite(connections)
-            model = opts['model']
-            model_opts = {k:v for k, v in opts.items() if k != 'model'}
-
-            metric_fit = model.fit(pair_metric[mask], connections[mask], **model_opts)
-            correction_fits[class_name].append(metric_fit)
-    
-    correction_parameters = [[fit.fit_result.x for fit in fits] for fits in correction_fits.values()]
-    correction_functions = [metric['model'].correction_func for metric in correction_metrics.values()]
-    corr_model = CorrectionModel(0.1, 100e-6, correction_metrics.keys(), correction_functions, correction_parameters)
+    corr_model['full_model'] = CorrectionModel(pmax, correction_metrics.keys(), correction_functions, correction_parameters)
     
     return corr_model
