@@ -172,7 +172,7 @@ def measure_connectivity(pair_groups, alpha=0.05, sigma=None, fit_model=None, co
         results[(pre_class, post_class)]['gap_probed_distances'] = gap_distances[mask2]
         results[(pre_class, post_class)]['gap_distances'] = gaps[mask2]
         
-        if sigma is not None and fit_model is not None:
+        if fit_model is not None:
             fit = fit_model.fit(distances[mask], connections[mask], method='L-BFGS-B', fixed_size=sigma)
             results[(pre_class, post_class)]['connectivity_fit'] = fit
             gap_fit = fit_model.fit(gap_distances[mask2], gaps[mask2], method='L-BFGS-B', fixed_size=sigma)
@@ -976,6 +976,7 @@ def get_cp_results(pairs, alpha=0.5):
         'connected_pairs': connections_found,
         'gap_pairs': gaps_found,
         'probed_pairs': probed_pairs,
+        'gaps_probed': gaps_probed,
     }
         
     return results
