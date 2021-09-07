@@ -1,4 +1,5 @@
 import datetime
+import os.path
 from sqlalchemy.orm import aliased, contains_eager, selectinload
 from collections import OrderedDict
 from .database import Database
@@ -61,12 +62,15 @@ class SynphysDatabase(Database):
         return current_versions
 
     @classmethod
-    def list_versions(cls):
+    def list_versions(cls, only_supported=False):
         """Return a list of all available database versions.
 
         Each item in the list is a dictionary with keys db_file, release_version, db_size, and schema_version.
         """
-        return list_db_versions()
+        vers = list_db_versions()
+        if only_supported:
+            vers = [v for v in vers if v['schema_version'] == cls.schema_version]
+        return vers
     
     @classmethod
     def load_version(cls, db_version):
@@ -101,7 +105,13 @@ class SynphysDatabase(Database):
         Database.__init__(self, ro_host, rw_host, db_name, ORMBase)
         self._project_names = None
         self._check_version()
-        
+
+    @property
+    def version_name(self):
+        """The version name of this database, as accepted by SynphysDatabase.load_version()
+        """
+        return os.path.split(self.db_name)[-1]
+
     def create_tables(self, tables=None):
         """This method is used when initializing a new database or new tables within an existing database.
 
