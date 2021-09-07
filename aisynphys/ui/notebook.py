@@ -276,7 +276,7 @@ def generate_connectivity_matrix(db, cell_classes, pair_query_args, ax):
     norm = matplotlib.colors.LogNorm(vmin=0.01, vmax=1.0, clip=True)
     cmap = matplotlib.cm.get_cmap('plasma')    
 
-    class_labels = {x:x for x in cell_classes.keys()}
+    class_labels = {cls:name for name,cls in cell_classes.items()}
 
     # finally, draw the colormap using the provided function:
     im, cbar, labels = show_connectivity_matrix(
