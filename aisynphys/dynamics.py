@@ -340,6 +340,7 @@ def stim_sorted_pulse_amp(pair):
         db.MultiPatchProbe.induction_frequency,
         db.MultiPatchProbe.recovery_delay,
         db.SyncRec.ext_id.label('sync_rec_ext_id'),
+        db.PulseResponse.id,
     )
     q = q.join(db.PulseResponse, db.PulseResponseFit.pulse_response)
     q = q.join(db.Recording, db.PulseResponse.recording)

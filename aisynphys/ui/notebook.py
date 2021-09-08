@@ -4,6 +4,7 @@ import io
 import numpy as np
 import matplotlib
 import matplotlib.cm
+import matplotlib.lines
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -16,6 +17,7 @@ from aisynphys.avg_response_fit import response_query, sort_responses
 from aisynphys.connectivity import connectivity_profile, distance_adjusted_connectivity
 from aisynphys.data import PulseResponseList
 from aisynphys.dynamics import stim_sorted_pulse_amp
+from aisynphys.database import default_db as db
 
 
 def heatmap(data, row_labels, col_labels, ax=None, ax_labels=None, bg_color=None,
@@ -194,7 +196,7 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                 elif corrections_applied:
                     cp, cp_lower_ci, cp_upper_ci = result['connectivity_correction_fit'].cp_ci
                     if correction_only:
-                        cp = cp / result['adjusted_connectivity'][0]
+                        cp = cp / result['connection_probability'][0] if result['connection_probability'][0] != 0 else np.nan
                         cp_lower_ci = cp # disabling the ci
                         cp_upper_ci = cp
                 else:
@@ -222,7 +224,7 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                 cprob_str[i,j] = "" if result['n_gaps_probed'] == 0 else "%d/%d" % (found, result['n_gaps_probed'])
 
             
-            cprob_alpha[i,j] = 1.0 - 1.0 * max(cp_upper_ci - cp, cp - cp_lower_ci)
+            cprob_alpha[i,j] = 1.0 - 1.5 * max(cp_upper_ci - cp, cp - cp_lower_ci)
 
 
     # map connection probability to RGB colors
@@ -294,26 +296,29 @@ def generate_connectivity_matrix(db, cell_classes, pair_query_args, ax):
 def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_args=None, metrics=None):
     synapse_metrics = {
         #                                     name                                  unit   scale alpha  db columns                                         colormap       log     clim           text format
-        'psp_amplitude':                      ('PSP Amplitude',                     'mV',  1e3,  1,     [db.Synapse.psp_amplitude],                        'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
-        'psp_rise_time':                      ('PSP Rise Time',                     'ms',  1e3,  0.5,   [db.Synapse.psp_rise_time],                        'viridis_r',   True,   (1, 10),       "%0.2f\nms"),
-        'psp_decay_tau':                      ('PSP Decay Tau',                     'ms',  1e3,  0.01,  [db.Synapse.psp_decay_tau],                        'viridis_r',   True,   (10, 200),      "%0.1f\nms"),
-        'psc_amplitude':                      ('PSC Amplitude',                     'pA',  1e12, 0.3,   [db.Synapse.psc_amplitude],                        'bwr',         False,  (-20, 20),     "%0.2g pA"),
-        'psc_rise_time':                      ('PSC Rise Time',                     'ms',  1e3,  1,     [db.Synapse.psc_rise_time],                        'viridis_r',   True,   (.1, 6),       "%0.2f ms"),
-        'psc_decay_tau':                      ('PSC Decay Tau',                     'ms',  1e3,  1,     [db.Synapse.psc_decay_tau],                        'viridis_r',   True,   (2, 20),       "%0.1f\nms"),
-        'latency':                            ('Latency',                           'ms',  1e3,  1,     [db.Synapse.latency],                              'viridis_r',   True,   (0.5, 3),      "%0.2f\nms"),
-        'pulse_amp_90th_percentile':          ('PSP Amplitude 90th %%ile',          'mV',  1e3,  1.5,   [db.Dynamics.pulse_amp_90th_percentile],           'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
+
+        'psp_amplitude':                      ('PSP Amplitude',                     'mV',  1e3,  1,     [db.Synapse.psp_amplitude],                        'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'psp_rise_time':                      ('PSP Rise Time',                     'ms',  1e3,  0.5,   [db.Synapse.psp_rise_time],                        'viridis_r',   True,   (1, 10),       "%0.2f"),
+        'psp_decay_tau':                      ('PSP Decay Tau',                     'ms',  1e3,  0.01,  [db.Synapse.psp_decay_tau],                        'viridis_r',   True,   (1, 50),       "%0.1f"),
+        'psc_amplitude':                      ('PSC Amplitude',                     'pA',  1e12, 0.3,   [db.Synapse.psc_amplitude],                        'bwr',         False,  (-20, 20),     "%0.2g"),
+        'psc_rise_time':                      ('PSC Rise Time',                     'ms',  1e3,  1,     [db.Synapse.psc_rise_time],                        'viridis_r',   True,   (.1, 6),       "%0.2f"),
+        'psc_decay_tau':                      ('PSC Decay Tau',                     'ms',  1e3,  1,     [db.Synapse.psc_decay_tau],                        'viridis_r',   True,   (2, 20),       "%0.1f"),
+        'latency':                            ('Latency',                           'ms',  1e3,  1,     [db.Synapse.latency],                              'viridis_r',   False,  (0.5, 2),      "%0.2f"),
+        'pulse_amp_90th_percentile':          ('90th Percentile PSP Amplitude',     'mV',  1e3,  1.5,   [db.Dynamics.pulse_amp_90th_percentile],           'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'junctional_conductance':             ('Junctional Conductance',            'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],           'viridis',     False,  (0, 10),       "%0.2f"),
+        'coupling_coeff_pulse':               ('Coupling Coefficient',              '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],             'viridis',     False,  (0, 1),        "%0.2f"),
         'stp_initial_50hz':                   ('Paired pulse STP',                  '',    1,    1,     [db.Dynamics.stp_initial_50hz],                    'bwr',         False,  (-0.5, 0.5),   "%0.2f"),
-        'stp_induction_50hz':                 ('Facilitation / depression',         '',    1,    1,     [db.Dynamics.stp_induction_50hz],                  'bwr',         False,  (-0.5, 0.5),   "%0.2f"),
-        'stp_recovery_250ms':                 ('STP Recovery',                      '',    1,    1,     [db.Dynamics.stp_recovery_250ms],                  'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
-        'stp_recovery_single_250ms':          ('STP Recovery',                      '',    1,    1,     [db.Dynamics.stp_recovery_single_250ms],           'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
-        'pulse_amp_first_50hz':               ('1st PSP Amplitude @ 50Hz',          '',    1e3,  1,     [db.Dynamics.pulse_amp_first_50hz],                'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
-        'pulse_amp_stp_initial_50hz':         ('2nd PSP Amplitude @ 50Hz',          '',    1e3,  1,     [db.Dynamics.pulse_amp_stp_initial_50hz],          'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
-        'pulse_amp_stp_induction_50hz':       ('PSP Amplitude STP induced @ 50Hz',  '',    1e3,  1,     [db.Dynamics.pulse_amp_stp_induction_50hz],        'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
-        'pulse_amp_stp_recovery_single_250ms':('PSP Amplitude STP recovered @ 250ms','',   1e3,  1,     [db.Dynamics.pulse_amp_stp_recovery_single_250ms], 'bwr',         False,  (-1.5, 1.5),   "%0.2f\nmV"),
+        'stp_induction_50hz':                 ('← Facilitating  Depressing →',      '',    1,    1,     [db.Dynamics.stp_induction_50hz],                  'bwr',         False,  (-0.5, 0.5),   "%0.2f"),
+        'stp_recovery_250ms':                 ('← Over-recovered  Not recovered →', '',    1,    1,     [db.Dynamics.stp_recovery_250ms],                  'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'stp_recovery_single_250ms':          ('← Over-recovered  Not recovered →', '',    1,    1,     [db.Dynamics.stp_recovery_single_250ms],           'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'pulse_amp_first_50hz':               ('1st PSP Amplitude @ 50Hz',          '',    1e3,  1,     [db.Dynamics.pulse_amp_first_50hz],                'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'pulse_amp_stp_initial_50hz':         ('2nd PSP Amplitude @ 50Hz',          '',    1e3,  1,     [db.Dynamics.pulse_amp_stp_initial_50hz],          'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'pulse_amp_stp_induction_50hz':       ('PSP Amplitude STP induced @ 50Hz',  '',    1e3,  1,     [db.Dynamics.pulse_amp_stp_induction_50hz],        'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'pulse_amp_stp_recovery_single_250ms':('PSP Amplitude STP recovered @ 250ms','',   1e3,  1,     [db.Dynamics.pulse_amp_stp_recovery_single_250ms], 'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
         'paired_event_correlation_1_2_r':     ('Paired event correlation 1:2',      '',    1,    1,     [db.Dynamics.paired_event_correlation_1_2_r],      'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
         'paired_event_correlation_2_4_r':     ('Paired event correlation 2:4',      '',    1,    1,     [db.Dynamics.paired_event_correlation_2_4_r],      'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
         'paired_event_correlation_4_8_r':     ('Paired event correlation 4:8',      '',    1,    1,     [db.Dynamics.paired_event_correlation_4_8_r],      'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
-        'junctional_conductance':             ('Junctional Conductance',            'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],           'viridis',     False,  (0, 10),       "%0.2f nS"),
+        'junctional_conductance':             ('Junctional Conductance',            'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],           'viridis',     False,  (0, 10),       "%0.2f"),
         'coupling_coeff_pulse':               ('Coupling Coefficient',              '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],             'viridis',     False,  (0, 1),        "%0.2f"),
         'variability_resting_state':          ('log(Resting state aCV)',       '',    1,    1,     [db.Dynamics.variability_resting_state],           'viridis',     False,  (-1, 1),       "%0.2f"),
         'variability_second_pulse_50hz':      ('log(second pulse aCV)',         '',    1,    1,    [db.Dynamics.variability_second_pulse_50hz],       'viridis',     False,  (-1, 1),       "%0.2f"),
@@ -378,9 +383,15 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         else:
             colors = palette
         c2 = [[c]*len(y_vals[i]) for i, c in enumerate(colors)]
-        x_vals = swarm(y_vals)
+        if cmap_log:
+            x_vals = swarm([[np.log(y) for y in group] for group in y_vals])
+            ax[i].set_yscale('log')
+        else:
+            x_vals = swarm(y_vals)
+            
+        plot = sns.barplot(x='pair_class', y=metric, data=pairs_has_metric, ax=ax[i], ci=None, 
+                           facecolor=(1, 1, 1, 0), edgecolor='black', order=pair_classes, estimator=estimator)
         ax[i].scatter(np.concatenate(x_vals), np.concatenate(y_vals), color=np.concatenate(c2), **plot_args)
-        plot = sns.barplot(x='pair_class', y=metric, data=pairs_has_metric, ax=ax[i], ci=None, facecolor=(1, 1, 1, 0), edgecolor='black', order=pair_classes, estimator=estimator)
         
         if i == len(metrics) - 1:
             ax[i].set_xlabel('pre→post class', size=12)
@@ -388,12 +399,10 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         else:
             ax[i].set_xlabel('')
             ax[i].set_xticklabels('')
-        label = metric_name + ' (%s)'%units
+        label = metric_name + (' (%s)'%units if units else '')
         label = '\n'.join(wrap(label, 20))
         ax[i].set_ylabel(label, size=10)
         ax[i].set_yticklabels([], minor=True)
-        if cmap_log:
-            ax[i].set_yscale('log')
         ax[i].spines['right'].set_visible(False)
         ax[i].spines['top'].set_visible(False)
         ax[i].yaxis.set_ticks_position('left')
@@ -441,7 +450,7 @@ def ei_hist_plot(ax, metric, bin_edges, db, pair_query_args):
     ax[0].spines['top'].set_visible(False)
     ax[1].spines['right'].set_visible(False)
     ax[1].spines['top'].set_visible(False)
-    ax[1].set_xlabel('%s (%s)' % (metric_name, units))
+    ax[1].set_xlabel(metric_name + (' (%s)'%units if units else ''))
     ax[1].set_ylabel('Number of Synapses', fontsize=12)
 
     #KS test
@@ -501,7 +510,7 @@ def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, p
         bg_color=(0.8, 0.8, 0.8),
         cmap=cmap,
         norm=norm,
-        cbarlabel=metric_name,
+        cbarlabel=metric_name + (' (%s)'%units if units else ''),
         cbar_kw={'shrink':0.5, 'pad':0.02},
     )
 
@@ -748,26 +757,46 @@ def data_matrix(data_df, cell_classes, metric=None, scale=1, unit=None, cmap=Non
     return data_rgb, data_str
 
 
-def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, color='k'):
+def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=False, scatter_args={}, line_args={}):
     qc_pass_data = stim_sorted_pulse_amp(pair)
 
     # scatter plots of event amplitudes sorted by pulse number 
     mask = qc_pass_data['induction_frequency'] == ind_f
-    filtered = qc_pass_data[mask]
+    filtered = qc_pass_data[mask].copy()
 
     sign = 1 if pair.synapse.synapse_type == 'ex' else -1
     try:
-        filtered['fit_amp'] *= sign * 1000
+        filtered['dec_fit_reconv_amp'] *= sign * 1000
     except KeyError:
         print('No fit amps for pair: %s' % pair)
-    ax.set_ylim(0, filtered['fit_amp'].max())
+    ax.set_ylim(0, filtered['dec_fit_reconv_amp'].max())
     ax.set_xlim(0, 13)
 
-    sns.swarmplot(x='pulse_number', y='fit_amp', data=filtered, color=(0.7, 0.7, 0.7), size=3, ax=ax)
+    scatter_opts = {'color': (0.7, 0.7, 0.7, ), 'size': 3}
+    scatter_opts.update(scatter_args)
+    sns.swarmplot(x='pulse_number', y='dec_fit_reconv_amp', data=filtered, ax=ax, **scatter_opts)
+    leg = ax.get_legend()
+    if leg is not None:
+        leg.remove()
+    
 
-    pulse_means = filtered.groupby('pulse_number').mean()['fit_amp'].to_list()
-    ax.plot(range(0,8), pulse_means[:8], color=color, linewidth=2, zorder=100)
-    ax.plot(range(8,12), pulse_means[8:12], color=color, linewidth=2, zorder=100)
+    line_opts = {'color': 'k', 'linewidth': 2, 'zorder': 100}
+    line_opts.update(line_args)
+    # plot a line at the average of all pulses of the same number
+    if avg_line:
+        pulse_means = filtered.groupby('pulse_number').mean()['dec_fit_reconv_amp'].to_list()
+        ax.plot(range(0,8), pulse_means[:8], **line_opts)
+        ax.plot(range(8,12), pulse_means[8:12], **line_opts)
+    # plot avg trace for each pulse number
+    if avg_trace:
+        for pulse_number in np.arange(1,13):
+            pulse_ids = filtered[filtered['pulse_number']==pulse_number]['id'].to_list()
+            prs = db.query(db.PulseResponse).filter(db.PulseResponse.id.in_(pulse_ids))
+            pr_list = PulseResponseList(prs)
+            post_trace = pr_list.post_tseries(align='spike', bsub=True, bsub_win=1e-3)
+            trace_mean = post_trace.mean()*1e3
+            trace_slice = trace_mean.time_slice(-1e-3, 8e-3)
+            ax.plot(trace_slice.time_values*1e2 + (pulse_number-1.4), abs(trace_slice.data),  **line_opts)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
@@ -853,3 +882,25 @@ def compose_svg_figure(figure_spec, filename, size, display=False):
         from IPython.display import SVG, display
         display(SVG(filename=filename))
 
+
+def make_scatter_legend(ax, values, cmap, norm, label_formatter, title, 
+                        color=None, markersize=10, linewidth=0, markeredgewidth=0,
+                        loc='upper left', bbox_to_anchor=(1, 1), marker='o',
+                        **kwds):
+    if isinstance(cmap, str):
+        cmap = matplotlib.cm.get_cmap(cmap)
+
+    legend_elements = []
+    for x in values:
+        legend_elements.append(matplotlib.lines.Line2D(
+            [0], [0], marker=marker, color=color, linewidth=linewidth, markeredgewidth=markeredgewidth,
+            label=label_formatter(x), markerfacecolor=cmap(norm(x)), markersize=markersize,
+        ))
+
+    return ax.legend(
+        handles=legend_elements, 
+        loc=loc, 
+        title=title,
+        bbox_to_anchor=bbox_to_anchor,
+        **kwds
+    )
