@@ -5,14 +5,14 @@ The actual schemas for database tables are implemented in other files in this su
 """
 from __future__ import division, print_function
 
-import os, sys, io, time, json, threading, gc, re, weakref
-from datetime import datetime
-from collections import OrderedDict
+import os, sys, io, json, threading, gc, re, weakref
+from collections import OrderedDict, namedtuple
 import numpy as np
 try:
     import queue
 except ImportError:
     import Queue as queue
+from inspect import isclass
 
 import sqlalchemy
 from distutils.version import LooseVersion
@@ -22,13 +22,14 @@ if LooseVersion(sqlalchemy.__version__) < '1.2':
 import sqlalchemy.inspection
 from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Boolean, Float, Date, DateTime, LargeBinary, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.orm import relationship, deferred, sessionmaker, reconstructor
 from sqlalchemy.types import TypeDecorator
 from sqlalchemy.sql.expression import func
 
 
 from .. import config
+from neuroanalysis.util.optional_import import optional_import
+pandas = optional_import('pandas')
 
 
 class NDArray(TypeDecorator):
@@ -45,10 +46,14 @@ class NDArray(TypeDecorator):
         return buf.getvalue()
         
     def process_result_value(self, value, dialect):
-        if value == b'':
+        if value is None or value == b'':
             return None
         buf = io.BytesIO(value)
         return np.load(buf, allow_pickle=False)
+
+    @property
+    def python_type(self):
+        return np.ndarray
 
 
 class JSONObject(TypeDecorator):
@@ -65,6 +70,10 @@ class JSONObject(TypeDecorator):
             return None
         return json.loads(value)
 
+    @property
+    def python_type(self):
+        object
+
 
 class FloatType(TypeDecorator):
     """For marshalling float types (including numpy).
@@ -75,7 +84,11 @@ class FloatType(TypeDecorator):
         if value is None:
             return None
         return float(value)
-        
+
+    @property
+    def python_type(self):
+        return float
+
     #def process_result_value(self, value, dialect):
         #buf = io.BytesIO(value)
         #return np.load(buf, allow_pickle=False)
@@ -644,12 +657,215 @@ class Database(object):
 
 
 class DBQuery(sqlalchemy.orm.Query):
-    def dataframe(self):
-        """Return a pandas dataframe constructed from the results of this query.
+    def add_table_columns(self, table, load_deferred=False):
+        """Return a new query with all columns in *table* added.
+
+        Parameters
+        ----------
+        table : sqlalchemy ORM table
+            The table from which columns will be added.
+        load_deferred : bool | list
+            If True, load all columns that are marked as deferred (by default,
+            these are ignored). Optionally, may specify a list of deferred
+            column names to load.
         """
-        import pandas
-        return pandas.read_sql(self.statement, self.session.bind)
-        
+        assert isinstance(load_deferred, (list, bool)), "load_deferred must be bool or list"
+        meta = sqlalchemy.inspect(table)
+        cols = []
+        for col in meta.columns.keys():
+            load = (
+                (not meta.column_attrs[col].deferred) or
+                (load_deferred is True) or
+                (isinstance(load_deferred, list) and col in load_deferred)
+            )
+            if load:
+                cols.append(col)
+        return self.add_columns(*cols)
+
+    def dataframe(self, expand_tables=True, rename_columns=True):
+        """Return a pandas dataframe constructed from the results of this query.
+
+        Columns are renamed from the original query (see DBQuery.recarray)
+
+        Parameters
+        ----------
+        expand_tables : bool | list
+            If True, expand all table entities included in the query into individual
+            columns. Optionally, a list of table names to expand may be provided instead.
+        rename_columns : bool
+            If True, columns are renamed (see DBQuery.recarray).
+        """
+        # don't like this; we want a bit more control over how columns are unpacked / renamed
+        if not rename_columns:
+            if expand_tables is False:
+                raise NotImplementedError("The combination expand_tables=False, rename_columns=False is not implemented")
+            return pandas.read_sql(self.statement, self.session.bind)
+
+        recs, col_names, col_types, rec_fields = self._prepare_array(expand_tables=expand_tables)
+
+        # coerce types
+        type_map = {float: 'float', int: pandas.Int64Dtype()}
+        col_types = [type_map.get(t, 'object') for t in col_types]
+
+        data = {}
+        for i, dest_col_name in enumerate(col_names):
+            source_col_name = rec_fields[i]
+            if isinstance(source_col_name, str):
+                col_data = [getattr(rec, source_col_name) for rec in recs]
+            elif isinstance(source_col_name, tuple):
+                col_data = [getattr(getattr(rec, source_col_name[0]), source_col_name[1], None) for rec in recs]
+            data[dest_col_name] = pandas.Series(col_data, dtype=col_types[i])
+
+        return pandas.concat(data, axis=1)
+
+    def recarray(self, expand_tables=True):
+        """Return a numpy record array constructed from the results of this query.
+
+        Columns are renamed from the original query based on the following rules:
+        - If a column label is explicitly provided, that label is used without modification
+        - Result columns that contain a single DB column are renamed to `table.column`
+        - Result columns that are derived from more complex expressions use a string representation of the expression
+        - Duplicate column names have `_N` appended
+
+        Parameters
+        ----------
+        expand_tables : bool | list
+            If True, expand all table entities included in the query into individual
+            columns. Optionally, a list of table names to expand may be provided instead.
+        """
+        recs, col_names, col_types, rec_fields = self._prepare_array(expand_tables=expand_tables)
+
+        # need to represent everything as either float or obj in order to support null values
+        col_types = ['float' if t is float else 'object' for t in col_types]
+
+        dtype = list(zip(col_names, col_types))
+
+        # convert records to numpy array
+        if expand_tables is False:
+            arr = np.array(recs, dtype=dtype)
+        else:
+            arr = np.empty(len(recs), dtype=dtype)
+            for i, dest_col_name in enumerate(col_names):
+                source_col_name = rec_fields[i]
+                if isinstance(source_col_name, str):
+                    arr[dest_col_name] = [getattr(rec, source_col_name) for rec in recs]
+                elif isinstance(source_col_name, tuple):
+                    arr[dest_col_name] = [getattr(getattr(rec, source_col_name[0]), source_col_name[1], None) for rec in recs]
+
+        return arr
+
+    def _prepare_array(self, expand_tables):
+        recs = self.all()
+        row_types = (tuple,)
+        try:
+            row_types = row_types + (sqlalchemy.engine.row.Row,)
+        except AttributeError:
+            pass
+
+        if len(recs) > 0 and not isinstance(recs[0], row_types):
+            # sqlalchemy returns lists of keyed tuples in most cases, but lists of ORM instances if only one
+            # column was requested. This is a pain to handle later on, so we're normalizing the output here.
+            rectyp = namedtuple('record', [self.column_descriptions[0]['name']])
+            recs = [rectyp(x) for x in recs]
+
+        # decide on column names and dtypes to use
+        col_names = []
+        col_types = []
+        rec_fields = []
+        for col in self.column_descriptions:
+            try:
+                from sqlalchemy.ext.declarative.api import DeclarativeMeta
+            except ImportError:
+                from sqlalchemy.orm.decl_api import DeclarativeMeta
+
+            if isinstance(col['type'], DeclarativeMeta):
+                # this column holds an entire table; use table name unless aliased
+                table_name = col['entity'].__table__.name
+                aliased_table_name = col['name'] if col['aliased'] else table_name
+                expand = (
+                    expand_tables is True or (
+                        isinstance(expand_tables, list) and (
+                            (table_name in expand_tables) or
+                            (col['entity'] in expand_tables)
+                        )
+                    )
+                )
+                if expand:
+                    # Which columns to expand?
+                    expanded_cols = self._get_expanded_cols(col, recs)
+                    for attribute_name in expanded_cols:
+                        col_names.append(aliased_table_name + '.' + attribute_name)
+                        rec_fields.append((col['name'], attribute_name))
+                        col_types.append(self._get_column_type(getattr(col['entity'], attribute_name)))
+                else:
+                    col_names.append(aliased_table_name)
+                    col_types.append('object')
+                    rec_fields.append(col['name'])
+            else:
+                rec_fields.append(col['name'])
+
+                expr = col['expr']
+                if isinstance(expr, sqlalchemy.sql.elements.Label):
+                    # query specifies a label here; use that name unconditionally
+                    col_names.append(expr.name)
+                else:
+                    # assign column names as table.column
+                    if isinstance(expr, sqlalchemy.orm.attributes.InstrumentedAttribute):
+                        table_name = sqlalchemy.inspect(col['entity']).name if col['aliased'] else col['entity'].__table__.name
+                        col_names.append(table_name + '.' + col['name'])
+                    elif isinstance(expr, sqlalchemy.sql.annotation.AnnotatedColumn):
+                        col_names.append(expr.table.name + '.' + expr.name)
+                    elif isinstance(expr, sqlalchemy.sql.elements.BinaryExpression):
+                        col_names.append(str(col['expr']) if col['name'] is None else col['name'])
+                    else:
+                        raise TypeError(f"recarray() does not support column of type {repr(expr)} (name: {col['name']})")
+
+                col_types.append(self._get_column_type(expr))
+
+        # modify any repeated names
+        seen_names = set()
+        for i,name in enumerate(col_names):
+            j = 0
+            while True:
+                new_name = name if j == 0 else f"{name}_{j}"
+                j += 1
+                if new_name not in seen_names:
+                    seen_names.add(new_name)
+                    col_names[i] = new_name
+                    break
+
+        return recs, col_names, col_types, rec_fields
+
+    def _get_expanded_cols(self, column_desc, records):
+        """Return the list of columns to use when expanding one entity column.
+
+        Ideally we'd ask sqlalchemy somehow, but for now we just find the first
+        non-null entry and ask which attributes were loaded. If no entries are found, then we can only
+        guess and the safest option is to include all columns.
+        """
+        col_name = column_desc['name']
+        first_item = None
+        for rec in records:
+            first_item = getattr(rec, col_name)
+            if first_item is not None:
+                break
+
+        insp = sqlalchemy.inspect(column_desc['entity'])
+        if getattr(insp, 'is_aliased_class', False):
+            insp = insp.mapper
+        all_columns = list(insp.columns.keys())
+        if first_item is None:
+            # no items returned in this query; just guess all columns
+            return all_columns
+        else:
+            unloaded = sqlalchemy.orm.attributes.instance_state(first_item).unloaded
+            return [c for c in all_columns if c not in unloaded]
+
+    def _get_column_type(self, column_expr):
+        if isinstance(column_expr, sqlalchemy.sql.elements.Label):
+            column_expr = column_expr._element
+        return column_expr.type.python_type
+
 
 class TableReadThread(threading.Thread):
     """Iterator that yields records (all columns) from a table.

@@ -15,7 +15,6 @@ class SynphysDatabase(Database):
     mouse_projects = ["mouse V1 coarse matrix", "mouse V1 pre-production"]
     human_projects = ["human coarse matrix"]
 
-
     @classmethod
     def load_sqlite(cls, sqlite_file, readonly=True):
         """Return a SynphysDatabase instance connected to an existing sqlite file.
@@ -25,24 +24,68 @@ class SynphysDatabase(Database):
         return cls(ro_host, rw_host, db_name=sqlite_file)
     
     @classmethod
-    def list_versions(cls):
-        """Return a list of the available database versions.
+    def load_current(cls, db_size):
+        """Load the most recent version of the database that is supported by this version
+        of aisynphys.
+
+        The database file will be downloaded and cached, if an existing cache file is not found.
+
+        Parameters
+        ----------
+        db_size : str
+            Must be one of 'small', 'medium', or 'full'.
         """
-        return list(list_db_versions().keys())
+        assert db_size in ('small', 'medium', 'full'), "db_size argument must be one of 'small', 'medium', or 'full'"
+        current = cls.list_current_versions()
+        if db_size not in current:
+            raise Exception(f"This version of aisynphys requires database schema version {cls.schema_version}, "
+                            "but no released database files were found with this schema version.")
+        return cls.load_version(current[db_size]['db_file'])
+
+    @classmethod
+    def list_current_versions(cls):
+        """Return a dict of the most recent DB versions for each size.
+
+        If no published DB file is available for a particular size, then the value will be set to None
+        in the returned dictionary.
+        """
+        versions_available = list_db_versions()
+        current_versions = {}
+        for size in ('small', 'medium', 'full'):
+            versions_with_size = [desc for desc in versions_available if desc['db_size'] == size and desc['schema_version'] == cls.schema_version]
+            if len(versions_with_size) == 0:
+                current_versions[size] = None
+            else:
+                current_versions[size] = versions_with_size[-1]
+
+        return current_versions
+
+    @classmethod
+    def list_versions(cls):
+        """Return a list of all available database versions.
+
+        Each item in the list is a dictionary with keys db_file, release_version, db_size, and schema_version.
+        """
+        return list_db_versions()
     
     @classmethod
     def load_version(cls, db_version):
         """Load a named database version.
         
         Available database names can be listed using :func:`list_versions`.
-        The database file will be downloaded and cached, if an existing cache file is not found.
+        The database file will be downloaded and cached, if an existing cache file is not found.        
 
         Example::
 
             >>> from aisynphys.database import SynphysDatabase
             >>> SynphysDatabase.list_versions()
-            ['synphys_r1.0_2019-08-29_small.sqlite', 'synphys_r1.0_2019-08-29_medium.sqlite', 'synphys_r1.0_2019-08-29_full.sqlite']
-            >>> db = SynphysDatabase.load_version('synphys_r1.0_2019-08-29_small.sqlite')
+            [
+                {'db_file': 'synphys_r1.0_small.sqlite'},
+                {'db_file': 'synphys_r1.0_medium.sqlite'},
+                {'db_file': 'synphys_r1.0_full.sqlite'},
+                ...
+            ]
+            >>> db = SynphysDatabase.load_version('synphys_r1.0_small.sqlite')
             Downloading http://api.brain-map.org/api/v2/well_known_file_download/937779595 =>
               /home/luke/docs/aisynphys/doc/cache/database/synphys_r1.0_2019-08-29_small.sqlite
               [####################]  100.00% (73.13 MB / 73.1 MB)  4.040 MB/s  0:00:00 remaining
@@ -50,14 +93,14 @@ class SynphysDatabase(Database):
 
         """
         db_file = get_db_path(db_version)
-        db = SynphysDatabase.load_sqlite(db_file, readonly=False)
-        # instantiate any new tables that have been added to the schema but don't exist in the db file
-        db.create_tables()
+        db = SynphysDatabase.load_sqlite(db_file, readonly=True)
         return db
 
     def __init__(self, ro_host, rw_host, db_name):
         from .schema import ORMBase
         Database.__init__(self, ro_host, rw_host, db_name, ORMBase)
+        self._project_names = None
+        self._check_version()
         
     def create_tables(self, tables=None):
         """This method is used when initializing a new database or new tables within an existing database.
@@ -78,13 +121,14 @@ class SynphysDatabase(Database):
             s.add(mrec)
             s.commit()
         else:
+            self._check_version()
+
+    def _check_version(self):
+        mrec = self.metadata_record()
+        if mrec is not None:
             ver = mrec.meta['db_version']
-            assert ver == schema_version, "Database has unsupported schema version %s (expected %s)"%(ver, schema_version)
+            assert ver == schema_version, "Database {self} has unsupported schema version {ver} (expected {schema_version})".format(locals())
     
-    @property
-    def metadata(self):
-        return self.metadata_record.meta.copy()
-        
     def metadata_record(self, session=None):
         session = session or self.default_session
         recs = session.query(self.Metadata).all()
@@ -143,8 +187,14 @@ class SynphysDatabase(Database):
         session = session or self.default_session
         return session.query(self.Experiment).all()
 
-    def pair_query(self, pre_class=None, post_class=None, synapse=None, synapse_type=None, electrical=None, 
-                   project_name=None, acsf=None, age=None, species=None, distance=None, internal=None, 
+    def list_project_names(self, session=None, cache=True):
+        session = session or self.default_session
+        if cache is False or self._project_names is None:
+            self._project_names = [rec[0] for rec in session.query(self.Experiment.project_name).distinct().all()]
+        return self._project_names
+
+    def pair_query(self, pre_class=None, post_class=None, synapse=None, synapse_type=None, synapse_probed=None, electrical=None,
+                   experiment_type=None, project_name=None, acsf=None, age=None, species=None, distance=None, internal=None,
                    preload=(), session=None, filter_exprs=None):
         """Generate a query for selecting pairs from the database.
 
@@ -158,8 +208,13 @@ class SynphysDatabase(Database):
             Include only pairs that are (or are not) connected by a chemical synapse
         synapse_type : str | None
             Include only synapses of a particular type ('ex' or 'in')
+        synapse_probed : bool | None
+            If True, include only pairs that were probed for a synaptic connection (regardless
+            of whether a connectin was found)
         electrical : bool | None
             Include only pairs that are (or are not) connected by an electrical synapse (gap junction)
+        experiment_type : str | None
+            Include only data from specific types of experiments
         project_name : str | list | None
             Value(s) to match from experiment.project_name (e.g. "mouse V1 coarse matrix" or "human coarse matrix")
         acsf : str | list | None
@@ -177,12 +232,19 @@ class SynphysDatabase(Database):
             List of strings specifying resources to preload along with the queried pairs. 
             This can speed up performance in cases where these would otherwise be 
             individually queried later on. Options are:
+            - "experiment" (includes experiment and slice)
             - "cell" (includes cell, morphology, cortical_location, and patch_seq)
-            - "synapse" (includes synapse, resting_statem dynamics, and synapse_prediction)
+            - "synapse" (includes synapse, resting_state, dynamics, and synapse_model)
+            - "synapse_prediction" (includes only synapse_prediction)
         filter_exprs : list | None
             List of sqlalchemy expressions, each of which will restrict the query
             via a call to query.filter(expr)
         """
+
+        if experiment_type == 'standard multipatch':
+            assert project_name is None, "cannot specify both experiment_type and project_name"
+            project_name = ['mouse V1 coarse matrix', 'mouse V1 pre-production', 'human coarse matrix']
+
         session = session or self.default_session
         pre_cell = aliased(self.Cell, name='pre_cell')
         post_cell = aliased(self.Cell, name='post_cell')
@@ -192,12 +254,11 @@ class SynphysDatabase(Database):
         post_patch_seq = aliased(self.PatchSeq, name='post_patch_seq')
         pre_intrinsic = aliased(self.Intrinsic, name='pre_intrinsic')
         post_intrinsic = aliased(self.Intrinsic, name='post_intrinsic')
-        pre_location = aliased(self.CorticalCellLocation, name='pre_location')
-        post_location = aliased(self.CorticalCellLocation, name='post_location')
-        query = session.query(
-            self.Pair,
-        )
-        query = (query
+        pre_location = aliased(self.CorticalCellLocation, name='pre_cortical_cell_location')
+        post_location = aliased(self.CorticalCellLocation, name='post_cortical_cell_location')
+
+        query = (
+            session.query(self.Pair)
             .join(pre_cell, pre_cell.id==self.Pair.pre_cell_id)
             .join(post_cell, post_cell.id==self.Pair.post_cell_id)
             .outerjoin(pre_morphology, pre_morphology.cell_id==pre_cell.id)
@@ -210,12 +271,13 @@ class SynphysDatabase(Database):
             .outerjoin(post_location, post_location.cell_id==post_cell.id)
             .join(self.Experiment, self.Pair.experiment_id==self.Experiment.id)
             .outerjoin(self.Slice, self.Experiment.slice_id==self.Slice.id) ## don't want to drop all pairs if we don't have slice or connection strength entries
-            .outerjoin(self.SynapsePrediction)
-            .outerjoin(self.Synapse)
-            .outerjoin(self.PolySynapse)
-            .outerjoin(self.Dynamics)
-            .outerjoin(self.GapJunction)
+            .outerjoin(self.Synapse, self.Synapse.pair_id==self.Pair.id)
+            .outerjoin(self.SynapsePrediction, self.SynapsePrediction.pair_id==self.Pair.id)
+            .outerjoin(self.Dynamics, self.Dynamics.pair_id==self.Pair.id)
             .outerjoin(self.RestingStateFit, self.RestingStateFit.synapse_id==self.Synapse.id)
+            .outerjoin(self.SynapseModel, self.SynapseModel.pair_id==self.Pair.id)
+            # .outerjoin(self.PolySynapse)
+            # .outerjoin(self.GapJunction)
         )
 
         if pre_class is not None:
@@ -228,12 +290,25 @@ class SynphysDatabase(Database):
             query = query.filter(self.Pair.has_synapse==synapse)
 
         if synapse_type is not None:
+            assert synapse_type in ['ex', 'in', 'mixed'], "synapse_type must be 'ex', 'in', or 'mixed'"
             query = query.filter(self.Synapse.synapse_type==synapse_type)
+
+        if synapse_probed is True:
+            from ..connectivity import probed_pair_test_spike_limit
+            query = query.filter(
+                ((pre_cell.cell_class == 'ex') & (self.Pair.n_ex_test_spikes > probed_pair_test_spike_limit)) |
+                ((pre_cell.cell_class == 'in') & (self.Pair.n_in_test_spikes > probed_pair_test_spike_limit)) |
+                ((self.Pair.n_ex_test_spikes > probed_pair_test_spike_limit) & (self.Pair.n_in_test_spikes > probed_pair_test_spike_limit))
+            )
 
         if electrical is not None:
             query = query.filter(self.Pair.has_electrical==electrical)
 
         if project_name is not None:
+            names = [project_name] if isinstance(project_name, str) else project_name
+            for name in names:
+                assert name in self.list_project_names(), "project_name %r not found in database (see SynphysDatabase.list_project_names)" % name
+
             if isinstance(project_name, str):
                 query = query.filter(self.Experiment.project_name==project_name)
             else:
@@ -269,9 +344,21 @@ class SynphysDatabase(Database):
         if filter_exprs is not None:
             for expr in filter_exprs:
                 query = query.filter(expr)
-                
+
+        if 'experiment' in preload:
+            query = (
+                query
+                .add_entity(self.Experiment)
+                .add_entity(self.Slice)
+            )
+            query = query.options(
+                contains_eager(self.Pair.experiment),
+                contains_eager(self.Experiment.slice),
+            )
+
         if 'cell' in preload:
-            query = (query
+            query = (
+                query
                 .add_entity(pre_cell)
                 .add_entity(post_cell)
                 .add_entity(pre_morphology)
@@ -297,12 +384,27 @@ class SynphysDatabase(Database):
             )
 
         if 'synapse' in preload:
-            query = query.add_entity(self.Synapse)
+            query = (
+                query
+                .add_entity(self.Synapse)
+                .add_entity(self.RestingStateFit)
+                .add_entity(self.Dynamics)
+                .add_entity(self.SynapseModel)
+            )
             query = query.options(
                 contains_eager(self.Pair.synapse),
-                selectinload(self.Pair.resting_state_fit), 
-                selectinload(self.Pair.dynamics), 
-                selectinload(self.Pair.synapse_prediction), 
+                contains_eager(self.Synapse.resting_state_fit),
+                contains_eager(self.Pair.dynamics),
+                contains_eager(self.Pair.synapse_model),
+            )
+
+        if 'synapse_prediction' in preload:
+            query = (
+                query
+                .add_entity(self.SynapsePrediction)
+            )
+            query = query.options(
+                contains_eager(self.Pair.synapse_prediction),
             )
 
         # package the aliased cells
@@ -338,7 +440,7 @@ class SynphysDatabase(Database):
                 if columns is not None:
                     pair_query = pair_query.add_columns(*columns)
                 
-                df = pair_query.dataframe()
+                df = pair_query.dataframe(rename_columns=False)
                 df['pre_class'] = pre_name
                 df['post_class'] = post_name
                 if pairs is None:

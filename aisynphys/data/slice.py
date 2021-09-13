@@ -1,11 +1,11 @@
 import os.path, re, datetime
-import numpy as np
-import pyqtgraph as pg
-import pyqtgraph.configfile
 
-from .. import lims, config
+from .. import lims
 from ..constants import ALL_CRE_TYPES, ALL_LABELS, FLUOROPHORES, LAYERS, INJECTIONS
 from ..genotypes import Genotype
+
+from neuroanalysis.util.optional_import import optional_import
+configfile = optional_import('pyqtgraph.configfile')
 
 
 class Slice(object):
@@ -31,7 +31,7 @@ class Slice(object):
             index = os.path.join(self.path, '.index')
             if not os.path.isfile(index):
                 return None
-            self._slice_info = pg.configfile.readConfigFile(index)['.']
+            self._slice_info = configfile.readConfigFile(index)['.']
         return self._slice_info
     
     @property
@@ -48,7 +48,7 @@ class Slice(object):
             index = os.path.join(self.parent_path, '.index')
             if not os.path.isfile(index):
                 raise TypeError("Cannot find index file (%s) for experiment %s" % (index, self))
-            self._parent_info = pg.configfile.readConfigFile(index)['.']
+            self._parent_info = configfile.readConfigFile(index)['.']
         return self._parent_info
 
     @property

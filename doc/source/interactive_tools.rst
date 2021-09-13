@@ -20,7 +20,7 @@ Simple tool for displaying PSPs and curve fits in response to 12-pulse spike tra
 
     conda activate aisynphys
     cd path/to/aisynphys
-    python tools/synaptic_dynamics.py --db-version=synphys_r1.0_2019-08-29_full.sqlite
+    python tools/synaptic_dynamics.py --db-version=full
 
 | Note: this command will attempt to download the full 175 GB database (if you don't have it already). Make sure you have enough free space on your drive. The download can be aborted at any time and resumed by running the command again.
 
@@ -32,6 +32,6 @@ Tool used for displaying averages of stimulus-responses grouped by clamp mode (v
 
     conda activate aisynphys
     cd path/to/aisynphys
-    python tools/pair_analysis.py --db-version=synphys_r1.0_2019-08-29_full.sqlite
+    python tools/pair_analysis.py --db-version=full
 
 | Note: this command will attempt to download the full 175 GB database (if you don't have it already). Make sure you have enough free space on your drive. The download can be aborted at any time and resumed by running the command again.

@@ -1,6 +1,6 @@
 # coding: utf8
 from __future__ import print_function, division
-import functools, pickle, time, os, multiprocessing, traceback, logging
+import functools, pickle, time, os, multiprocessing, traceback, logging, re
 from collections import OrderedDict
 import numpy as np
 import numba
@@ -935,7 +935,7 @@ class StochasticModelRunner:
 
         # 1. Get a list of all presynaptic spike times and the amplitudes of postsynaptic responses
 
-        events = self._event_query(pair, self.db, session).dataframe()
+        events = self._event_query(pair, self.db, session).dataframe(rename_columns=False)
         logger.info("loaded %d events", len(events))
 
         if len(events) == 0:
@@ -967,7 +967,7 @@ class StochasticModelRunner:
         logger.info("%d good events to be analyzed", np.isfinite(amplitudes).sum())
         
         # get background events for determining measurement noise
-        bg_amplitudes = events['baseline_dec_fit_reconv_amp'].to_numpy()
+        bg_amplitudes = events['baseline_dec_fit_reconv_amp'].to_numpy().astype(float)
         # filter by qc
         bg_qc_mask = events['baseline_'+qc_field] == True
         bg_amplitudes[~qc_mask] = np.nan
@@ -1117,6 +1117,8 @@ def list_cached_results(cache_path=None):
     files = os.listdir(cache_path)
     results = []
     for cf in files:
+        if re.match(r'[0-9]{10}\.[0-9]{3}_[0-9]_[0-9].pkl$', cf) is None:
+            continue
         syn_id = tuple(os.path.splitext(cf)[0].split('_'))
         results.append((syn_id, os.path.join(cache_path, cf)))
     return results

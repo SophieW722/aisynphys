@@ -49,6 +49,7 @@ PatchSeq = make_table(
     ('last_map', 'str', 'mapping from the last batch run', {'index': True}),
     ('last_score', 'str', 'mapping score from the last batch run', {'index': True}),
     ('mapped_subclass', 'str', 'Subclass that this cell mapped to', {'index': True}),
+    ('batch', 'str', 'Shiny batch number, used for tracking updates', {'index': True}),
 ])
 
 Cell.patch_seq = relationship(PatchSeq, back_populates="cell", cascade="delete", single_parent=True, uselist=False)

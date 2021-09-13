@@ -245,10 +245,12 @@ class CellClass(object):
         morpho = aliased(db.Morphology)
         intrinsic = aliased(db.Intrinsic)
         location = aliased(db.CorticalCellLocation)
+        patch_seq = aliased(db.PatchSeq)
         query = (query.outerjoin(morpho, morpho.cell_id==cell_table.id)
                  .outerjoin(intrinsic, intrinsic.cell_id==cell_table.id)
-                 .outerjoin(location, location.cell_id==cell_table.id))
-        tables = [cell_table, morpho, intrinsic, location]
+                 .outerjoin(location, location.cell_id==cell_table.id)
+                 .outerjoin(patch_seq, patch_seq.cell_id==cell_table.id))
+        tables = [cell_table, morpho, intrinsic, location, patch_seq]
         for expr in self.exprs:
             found_attr = False
             key = expr.left.name
@@ -274,8 +276,51 @@ class CellClass(object):
                 raise Exception('Cannot use "%s" for cell typing; attribute not found in available tables.' % k)
 
         return query                
-                
-            
+
+    def dataframe_mask(self, df, prefix=''):
+        """Given a dataframe containing columns describing cell properties, return a boolean
+        Series that indicates whether the cell in each row is a member of the class.
+
+        Dataframe columns must be named like "cell.cre_type" or "morphology.dendrite_type", as
+        defined in the database. Optionally, these names may begin with *prefix*.
+        """
+        global _criteria_attributes
+        import pandas
+
+        mask = pandas.Series([True] * len(df))
+        if len(self.criteria) == 0 and len(self.exprs) == 0:
+            return mask
+
+        # check expressions
+        for expr in self.exprs:
+            # get variable name and value from expression
+            key = expr.left.name
+            ref_val = expr.right.value
+
+            # check requested value
+            col = df[self._get_df_col_name(key, prefix)]
+            mask &= expr.operator(col, ref_val)
+
+        # check keyword arg criteria
+        for k, v in self.criteria.items():
+            if isinstance(v, dict):
+                raise NotImplementedError("dict cell class criteria not supported in dataframe_mask")
+            elif isinstance(v, (tuple, list)):
+                # lists/tuples: items in column must be in list
+                col = df[self._get_df_col_name(k, prefix)]
+                mask &= col.isin(v)
+            else:
+                # scalars: items in column must be equal to value
+                col = df[self._get_df_col_name(k, prefix)]
+                mask &= (col == v)
+
+        return mask
+
+    def _get_df_col_name(self, key, prefix):
+        table_name = _criteria_attributes.get(key, [None])[0]
+        if table_name is None:
+            raise Exception(f'Cannot use "{key}" for cell typing; attribute not found on cell or linked tables')
+        return prefix + table_name + '.' + key
 
 
 def classify_cells(cell_classes, cells=None, pairs=None, missing_attr='raise'):
@@ -333,6 +378,20 @@ def classify_cells(cell_classes, cells=None, pairs=None, missing_attr='raise'):
     return cell_groups
 
 
+def classify_cell_dataframe(cell_classes, df, prefix=''):
+    """Classify cells in a pandas dataframe using a dictionary of cell classes.
+
+    Returns a pandas series giving the key for the first cell class to match each row.
+    """
+    import pandas
+    match = pandas.Series([None] * len(df), dtype=object)
+    for k, cls in reversed(list(cell_classes.items())):
+        mask = cls.dataframe_mask(df, prefix=prefix)
+        match[mask] = k
+
+    return match
+
+
 def classify_pairs(pairs, cell_groups):
     """Given a list of cell pairs and a dict that groups cells together by class (ie the output of classify_cells),
     return a dict that groups pairs into (pre, post) cell type buckets.
@@ -358,6 +417,14 @@ def classify_pairs(pairs, cell_groups):
             results[(pre_class, post_class)] = class_pairs
     
     return results
+
+
+def classify_pair_dataframe(cell_classes, df, col_names=('pre_class', 'post_class')):
+    """Add two new columns to a pair dataframe giving the pre and post class
+    names.
+    """
+    df[col_names[0]] = classify_cell_dataframe(cell_classes, df, prefix='pre_')
+    df[col_names[1]] = classify_cell_dataframe(cell_classes, df, prefix='post_')
 
 
 _criteria_attribute_cache = {}

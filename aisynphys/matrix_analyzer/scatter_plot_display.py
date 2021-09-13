@@ -9,6 +9,7 @@ import pyqtgraph as pg
 import pandas as pd
 import numpy as np
 from ..ui.actions import PairActions
+from aisynphys.ui.ScatterPlotWidget import ScatterPlotWidget
 
 
 class ScatterPlotTab(pg.QtGui.QWidget):
@@ -24,9 +25,9 @@ class ScatterPlotTab(pg.QtGui.QWidget):
         self.v_splitter.addWidget(self.element_scatter)
         self.v_splitter.addWidget(self.pair_scatter)
 
-class ScatterPlots(pg.ScatterPlotWidget):
+class ScatterPlots(ScatterPlotWidget):
     def __init__(self):
-        pg.ScatterPlotWidget.__init__(self)
+        ScatterPlotWidget.__init__(self)
 
     def set_fields(self, fields):
         self.fields = [('pair_class', {'mode': 'enum'})]

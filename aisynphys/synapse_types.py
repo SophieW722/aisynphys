@@ -63,8 +63,52 @@ default_data_fields = [
     'paired_event_correlation_2_4_p',
     'paired_event_correlation_4_8_r',
     'paired_event_correlation_4_8_p',
-]
 
+    'n_model_source_events',
+    'max_likelihood',
+    'ml_n_release_sites',
+    'ml_base_release_probability',
+    'ml_mini_amplitude',
+    'ml_mini_amplitude_cv',
+    'ml_depression_amount',
+    'ml_depression_tau',
+    'ml_facilitation_amount',
+    'ml_facilitation_tau',
+    'ml_measurement_stdev',
+    'ml_strength',
+    'ml_quanta_per_spike',
+    'ml_sites_pr_ratio',
+    'ml_release_dependence_ratio',
+
+    'ml_paired_pulse_ratio_50hz',
+    'ml_stp_initial_50hz',
+    'ml_stp_initial_50hz_n',
+    'ml_stp_initial_50hz_std',
+    'ml_stp_induction_50hz',
+    'ml_stp_induction_50hz_n',
+    'ml_stp_induction_50hz_std',
+    'ml_stp_recovery_250ms',
+    'ml_stp_recovery_250ms_n',
+    'ml_stp_recovery_250ms_std',
+    'ml_stp_recovery_single_250ms',
+    'ml_stp_recovery_single_250ms_n',
+    'ml_stp_recovery_single_250ms_std',
+    'ml_pulse_amp_90th_percentile',
+    'ml_noise_amp_90th_percentile',
+    'ml_noise_std',
+    'ml_variability_resting_state',
+    'ml_variability_second_pulse_50hz',
+    'ml_variability_stp_induced_state_50hz',
+    'ml_variability_change_initial_50hz',
+    'ml_variability_change_induction_50hz',
+    'ml_paired_event_correlation_1_2_r',
+    'ml_paired_event_correlation_1_2_p',
+    'ml_paired_event_correlation_2_4_r',
+    'ml_paired_event_correlation_2_4_p',
+    'ml_paired_event_correlation_4_8_r',
+    'ml_paired_event_correlation_4_8_p',
+
+]
 
 
 def synapse_query(db=default_db):
@@ -77,6 +121,7 @@ def synapse_query(db=default_db):
     pre_cell = q.pre_cell
     post_cell = q.post_cell
     q = (q
+        .join(db.SynapseModel)
         .add_entity(db.Synapse)
         .add_entity(db.Dynamics)
         .add_column(pre_cell.cre_type.label('pre_cre_type'))
@@ -89,6 +134,8 @@ def synapse_query(db=default_db):
         .add_column(post_cell.ext_id.label('post_ext_id'))
         .add_column(q.pre_location.cortical_layer.label('pre_layer'))
         .add_column(q.post_location.cortical_layer.label('post_layer'))
+        .add_column(db.SynapseModel.n_source_events.label('n_model_source_events'))
+        .add_entity(db.SynapseModel)
     )
     return q
 
@@ -205,10 +252,6 @@ def run_umap_pipeline(data, mapper, features):
     # only keep synapses with all feature fields
     mask = data[features].isna().any(axis=1)
 
-    # filter out weakest synapses
-    #mask = mask | (syn_data['psp_log_snr'] < 1)
-    mask = mask | (abs(data['pulse_amp_90th_percentile']) < 200e-6)
-
     clean_syn_data = data.loc[~mask].copy()
 
     print("Dropped to %d synapses" % len(clean_syn_data))
@@ -225,7 +268,7 @@ def run_umap_pipeline(data, mapper, features):
     return clean_syn_data.join(embedding)
 
 
-def show_umap(data, ax, title=None, legend_title=None, **kwds):
+def show_umap(data, ax, title=None, legend_title=None, picking=True, **kwds):
     """Default styling and convenience features for generating umap scatter plots.
     """
     x, y = 'umap-0', 'umap-1'
@@ -234,7 +277,9 @@ def show_umap(data, ax, title=None, legend_title=None, **kwds):
         x=x, y=y,
         linewidth=0,
         s=70,
-        ax=ax, legend=False,
+        ax=ax,
+        legend=False,
+        picker=True,
     )
     opts.update(kwds)
     
@@ -258,6 +303,16 @@ def show_umap(data, ax, title=None, legend_title=None, **kwds):
         ax.set_title(title)
     if legend_title is not None:
         sp.legend().set_title(legend_title)
+
+    if picking:
+        text = ax.text(0, 1, "", va="top", ha="left", transform=ax.transAxes)
+
+        def onpick(event):
+            t = '\n'.join([" ".join(data.index[i]) for i in event.ind])
+            text.set_text(t)
+            print(t)
+
+        cid = ax.figure.canvas.mpl_connect('pick_event', onpick)
 
     return sp
 

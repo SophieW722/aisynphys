@@ -145,6 +145,7 @@ class MatrixWidget(pg.GraphicsLayoutWidget):
     sigClicked = pg.QtCore.Signal(object, object, object, object) # self, matrix_item, row, col
     def __init__(self):
         pg.GraphicsLayoutWidget.__init__(self)
+        self.ci.layout.setContentsMargins(0, 0, 0, 0)
         self.setRenderHints(self.renderHints() | pg.QtGui.QPainter.Antialiasing)
         v = self.addViewBox()
         v.setBackgroundColor('w')
@@ -167,7 +168,8 @@ class MatrixWidget(pg.GraphicsLayoutWidget):
 
 
 class MatrixDisplay(object):
-    sigClicked = pg.QtCore.Signal(object, object, object, object, object) # self, matrix_item, event, row, col
+    sigClicked = pg.QtCore.Signal(object, object, object, object, object)  # self, matrix_item, event, row, col
+
     def __init__(self, window, output_fields, text_fields, field_map):
         self.main_window = window
         self.matrix_widget = self.main_window.matrix_widget
@@ -178,10 +180,6 @@ class MatrixDisplay(object):
     def get_element_classes(self, row, col):
         pre_class, post_class = [k for k, v in self.matrix_map.items() if v==[row, col]][0]
         return pre_class, post_class
-
-    def get_field_analyzer(self):
-        analyzer = self.field_map[self.field_name]
-        return analyzer, field_name
 
     def color_element(self, row, col, color):
         self.element = self.matrix_widget.matrix.cells[row[0]][col[0]]

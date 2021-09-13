@@ -38,21 +38,24 @@ class MainWindow(pg.QtGui.QWidget):
         pg.QtGui.QWidget.__init__(self)
         self.layout = pg.QtGui.QGridLayout()
         self.setLayout(self.layout)
+        self.layout.setContentsMargins(0, 0, 0, 0)
         self.h_splitter = pg.QtGui.QSplitter()
         self.h_splitter.setOrientation(pg.QtCore.Qt.Horizontal)
         self.layout.addWidget(self.h_splitter, 0, 0)
-        self.control_panel_splitter = pg.QtGui.QSplitter()
-        self.control_panel_splitter.setOrientation(pg.QtCore.Qt.Vertical)
-        self.h_splitter.addWidget(self.control_panel_splitter)
+        self.control_panel = pg.QtGui.QWidget()
+        self.ctrl_layout = pg.QtGui.QGridLayout()
+        self.ctrl_layout.setContentsMargins(0, 0, 0, 0)
+        self.control_panel.setLayout(self.ctrl_layout)
+        self.h_splitter.addWidget(self.control_panel)
         self.update_button = pg.QtGui.QPushButton("Update Results")
-        self.control_panel_splitter.addWidget(self.update_button)
+        self.ctrl_layout.addWidget(self.update_button, 0, 0)
         self.ptree = ptree.ParameterTree(showHeader=False)
-        self.control_panel_splitter.addWidget(self.ptree)
+        self.ctrl_layout.addWidget(self.ptree, 1, 0)
         self.matrix_widget = MatrixWidget()
         self.h_splitter.addWidget(self.matrix_widget)
         self.tabs = Tabs()
         self.h_splitter.addWidget(self.tabs)
-        self.h_splitter.setSizes([300, 600, 400])        
+        self.h_splitter.setSizes([500, 600, 400])
 
 
 class Tabs(pg.QtGui.QTabWidget):
@@ -226,7 +229,7 @@ class MatrixAnalyzer(object):
     def __init__(self, session, cell_class_groups=None, default_preset=None, preset_file=None, analyzer_mode='internal'):
         
         self.main_window = MainWindow()
-        self.main_window.setGeometry(280, 130, 1500, 900)
+        self.main_window.resize(1500, 900)
         self.main_window.setWindowTitle('MatrixAnalyzer')
         self.main_window.show()
         self.tabs = self.main_window.tabs
@@ -475,6 +478,7 @@ class MatrixAnalyzer(object):
                 self.distance_plot.element_distance(element, color)
                 self.element_scatter.color_selected_element(color, pre_class, post_class)
                 self.pair_scatter.color_selected_element(color, pre_class, post_class)
+                self.cell_scatter.color_selected_element(color, pre_class, post_class)
                 # self.pair_scatter.filter_selected_element(pre_class, post_class)
             else:
                 self.display_matrix_element_reset() 
@@ -484,6 +488,7 @@ class MatrixAnalyzer(object):
                 self.distance_plot.element_distance(element, color)
                 self.element_scatter.color_selected_element(color, pre_class, post_class)
                 self.pair_scatter.color_selected_element(color, pre_class, post_class)
+                self.cell_scatter.color_selected_element(color, pre_class, post_class)
                 # self.pair_scatter.filter_selected_element(pre_class, post_class)
 
     def display_matrix_element_reset(self):

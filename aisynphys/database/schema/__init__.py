@@ -2,7 +2,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from ..database import make_table_docstring, make_table as orig_make_table
 
 # schema version should be incremented whenever the schema has changed
-schema_version = "19"
+schema_version = "20"
 
 # all time series data are downsampled to this rate in the DB
 default_sample_rate = 20000
@@ -49,6 +49,7 @@ from .resting_state_fit import *
 from .gap_junction import *
 from .cortical_location import *
 from .patch_seq import *
+from .synapse_model import *
 
 # Create all docstrings now that relationships have been declared
 for cls in ORMBase.__subclasses__():

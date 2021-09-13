@@ -1,11 +1,7 @@
-from __future__ import division, print_function
-import os, sys, glob, re, time
-import numpy as np
-from datetime import datetime
+import os, sys, glob, re
 from collections import OrderedDict
 from .pipeline_module import MultipatchPipelineModule
 from ... import config, lims
-from ...util import datetime_to_timestamp, dir_timestamp
 from ...data import Experiment
 from .slice import SlicePipelineModule
 from neuroanalysis.util.optional_import import optional_import
@@ -233,7 +229,7 @@ class DataRepo(object):
         if self._expts is None:
             yamls = self.list_pip_yamls()
             site_dirs = sorted([os.path.dirname(yml) for yml in yamls], reverse=True)
-            self._expts = OrderedDict([('%0.3f'%dir_timestamp(site_dir), site_dir) for site_dir in site_dirs])
+            self._expts = OrderedDict([('%0.3f'%getDirHandle(site_dir).info()['__timestamp__'], site_dir) for site_dir in site_dirs])
         return self._expts
 
     def list_nwbs(self):

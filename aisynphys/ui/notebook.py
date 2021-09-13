@@ -4,6 +4,7 @@ import io
 import numpy as np
 import matplotlib
 import matplotlib.cm
+import matplotlib.lines
 import matplotlib.pyplot as plt
 import pandas as pd
 import seaborn as sns
@@ -16,6 +17,7 @@ from aisynphys.avg_response_fit import response_query, sort_responses
 from aisynphys.connectivity import connectivity_profile, distance_adjusted_connectivity
 from aisynphys.data import PulseResponseList
 from aisynphys.dynamics import stim_sorted_pulse_amp
+from aisynphys.database import default_db as db
 
 
 def heatmap(data, row_labels, col_labels, ax=None, ax_labels=None, bg_color=None,
@@ -194,7 +196,7 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                 elif corrections_applied:
                     cp, cp_lower_ci, cp_upper_ci = result['connectivity_correction_fit'].cp_ci
                     if correction_only:
-                        cp = cp / result['adjusted_connectivity'][0]
+                        cp = cp / result['connection_probability'][0] if result['connection_probability'][0] != 0 else np.nan
                         cp_lower_ci = cp # disabling the ci
                         cp_upper_ci = cp
                 else:
@@ -207,6 +209,11 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                     cp, cp_lower_ci, cp_upper_ci = result['gap_probability']
             else:
                 raise Exception('ctype must be one of "chemical" or "electrical"')
+            
+            if not correction_only:
+                cp = min(cp, 1)
+                cp_upper_ci = min(1, cp_upper_ci)
+                cp_lower_ci = max(0, cp_lower_ci)
 
             cprob[i,j] = cp
             if ctype == 'chemical':
@@ -215,7 +222,10 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
                     cprob_str[i,j] += "\n %.3f" %(cp)
             elif ctype == 'electrical':
                 cprob_str[i,j] = "" if result['n_gaps_probed'] == 0 else "%d/%d" % (found, result['n_gaps_probed'])
-            cprob_alpha[i,j] = 1.0 - 2.0 * max(cp_upper_ci - cp, cp - cp_lower_ci)
+
+            
+            cprob_alpha[i,j] = 1.0 - 1.5 * max(cp_upper_ci - cp, cp - cp_lower_ci)
+
 
     # map connection probability to RGB colors
     mapper = matplotlib.cm.ScalarMappable(norm=norm, cmap=cmap)
@@ -247,30 +257,72 @@ def show_connectivity_matrix(ax, results, pre_cell_classes, post_cell_classes, c
     return im, cbar, labels
 
 
+def generate_connectivity_matrix(db, cell_classes, pair_query_args, ax):
+    from ..connectivity import measure_connectivity
+    from ..cell_class import classify_cells, classify_pairs
+
+    pairs = db.pair_query(**pair_query_args).all()
+
+    # Group all cells by selected classes
+    cell_groups = classify_cells(cell_classes.values(), pairs=pairs)
+
+    # Group pairs into (pre_class, post_class) groups
+    pair_groups = classify_pairs(pairs, cell_groups)
+
+    # analyze matrix elements
+    results = measure_connectivity(pair_groups, sigma=100e-6, dist_measure='lateral_distance')
+
+    # define a colormap and log normalization used to color the heatmap
+    norm = matplotlib.colors.LogNorm(vmin=0.01, vmax=1.0, clip=True)
+    cmap = matplotlib.cm.get_cmap('plasma')    
+
+    class_labels = {cls:name for name,cls in cell_classes.items()}
+
+    # finally, draw the colormap using the provided function:
+    im, cbar, labels = show_connectivity_matrix(
+        ax=ax, 
+        results=results, 
+        pre_cell_classes=cell_classes.values(), 
+        post_cell_classes=cell_classes.values(), 
+        class_labels=class_labels, 
+        cmap=cmap, 
+        norm=norm,
+        distance_adjusted=True
+    )
+
+    return results, (im, cbar, labels)
+
+
 def get_metric_data(metric, db, pre_classes=None, post_classes=None, pair_query_args=None, metrics=None):
     synapse_metrics = {
-        #                               name                         unit   scale alpha  db columns                                    colormap      log     clim           text format
-        'psp_amplitude':               ('PSP Amplitude',             'mV',  1e3,  1,     [db.Synapse.psp_amplitude],                   'bwr',        False,  (-1.5, 1.5),   "%0.2f\nmV"),
-        'psp_rise_time':               ('PSP Rise Time',             'ms',  1e3,  0.5,   [db.Synapse.psp_rise_time],                   'viridis_r',  True,  (1, 10),        "%0.2f\nms"),
-        'psp_decay_tau':               ('PSP Decay Tau',             'ms',  1e3,  0.01,     [db.Synapse.psp_decay_tau],                 'viridis_r',  True,  (1, 200),       "%0.1f\nms"),
-        'psc_amplitude':               ('PSC Amplitude',             'pA',  1e12,  0.3,     [db.Synapse.psc_amplitude],                   'bwr',        False,  (-20, 20),       "%0.2g pA"),
-        'psc_rise_time':               ('PSC Rise Time',             'ms',  1e3,  1,     [db.Synapse.psc_rise_time],                   'viridis_r',  False,  (0, 6),        "%0.2f ms"),
-        'psc_decay_tau':               ('PSC Decay Tau',             'ms',  1e3,  1,     [db.Synapse.psc_decay_tau],                   'viridis_r',  False,  (0, 20),       "%0.1f\nms"),
-        'latency':                     ('Latency',                   'ms',  1e3,  1,     [db.Synapse.latency],                         'viridis_r',  False,  (0.5, 3),      "%0.2f\nms"),
-        'pulse_amp_90th_percentile':   ('PSP Amplitude 90th %%ile',  'mV',  1e3,  1.5,   [db.Dynamics.pulse_amp_90th_percentile],      'bwr',        False,  (-1.5, 1.5),   "%0.2f\nmV"),
-        'junctional_conductance':      ('Junctional Conductance',    'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],      'viridis',     False,  (0, 10),       "%0.2f nS"),
-        'coupling_coeff_pulse':        ('Coupling Coefficient',      '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],        'viridis',     False,  (0, 1),        "%0.2f"),
-        'stp_initial_50hz':            ('Paired pulse STP',          '',    1,    1,     [db.Dynamics.stp_initial_50hz],               'bwr',        False,  (-0.5, 0.5),   "%0.2f"),
-        'stp_induction_50hz':          ('← Facilitating  Depressing →', '',    1,    1,     [db.Dynamics.stp_induction_50hz],             'bwr',        False,  (-0.5, 0.5),   "%0.2f"),
-        'stp_recovery_250ms':          ('← Over-recovered  Not recovered →','',    1,    1,     [db.Dynamics.stp_recovery_250ms],             'bwr',        False,  (-0.2, 0.2),   "%0.2f"),
-        'stp_recovery_single_250ms':   ('← Over-recovered  Not recovered →','',    1,    1,     [db.Dynamics.stp_recovery_single_250ms],      'bwr', False,  (-0.2, 0.2),   "%0.2f"),
-        'paired_event_correlation_1_2_r': ('Paired event correlation 1:2','',    1,    1,     [db.Dynamics.paired_event_correlation_1_2_r],   'bwr', False,  (-0.2, 0.2),   "%0.2f"),
-        'paired_event_correlation_2_4_r': ('Paired event correlation 2:4','',    1,    1,     [db.Dynamics.paired_event_correlation_2_4_r],   'bwr', False,  (-0.2, 0.2),   "%0.2f"),
-        'paired_event_correlation_4_8_r': ('Paired event correlation 4:8','',    1,    1,     [db.Dynamics.paired_event_correlation_4_8_r],   'bwr', False,  (-0.2, 0.2),   "%0.2f"),
-        'junctional_conductance':      ('Junctional Conductance',    'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],      'viridis',     False,  (0, 10),        "%0.2f nS"),
-        'coupling_coeff_pulse':        ('Coupling Coefficient',       '',   1,    1,     [db.GapJunction.coupling_coeff_pulse],        'viridis',    False,  (0, 1),          "%0.2f"),
-        'variability_resting_state':   ('log(Resting state variance)', '',   1,  1,  [db.Dynamics.variability_resting_state],       'viridis',   False, (-1, 1),     "%0.2f"),
-        'variability_stp_induced_state_50hz': ('log(STP induced variance)', '', 1,    1,      [db.Dynamics.variability_stp_induced_state_50hz], 'viridis', False, (-1, 1),        "%0.2f"),
+        #                                     name                                  unit   scale alpha  db columns                                         colormap       log     clim           text format
+
+        'psp_amplitude':                      ('PSP Amplitude',                     'mV',  1e3,  1,     [db.Synapse.psp_amplitude],                        'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'psp_rise_time':                      ('PSP Rise Time',                     'ms',  1e3,  0.5,   [db.Synapse.psp_rise_time],                        'viridis_r',   True,   (1, 10),       "%0.2f"),
+        'psp_decay_tau':                      ('PSP Decay Tau',                     'ms',  1e3,  0.01,  [db.Synapse.psp_decay_tau],                        'viridis_r',   True,   (1, 50),       "%0.1f"),
+        'psc_amplitude':                      ('PSC Amplitude',                     'pA',  1e12, 0.3,   [db.Synapse.psc_amplitude],                        'bwr',         False,  (-20, 20),     "%0.2g"),
+        'psc_rise_time':                      ('PSC Rise Time',                     'ms',  1e3,  1,     [db.Synapse.psc_rise_time],                        'viridis_r',   True,   (.1, 6),       "%0.2f"),
+        'psc_decay_tau':                      ('PSC Decay Tau',                     'ms',  1e3,  1,     [db.Synapse.psc_decay_tau],                        'viridis_r',   True,   (2, 20),       "%0.1f"),
+        'latency':                            ('Latency',                           'ms',  1e3,  1,     [db.Synapse.latency],                              'viridis_r',   False,  (0.5, 2),      "%0.2f"),
+        'pulse_amp_90th_percentile':          ('90th Percentile PSP Amplitude',     'mV',  1e3,  1.5,   [db.Dynamics.pulse_amp_90th_percentile],           'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'junctional_conductance':             ('Junctional Conductance',            'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],           'viridis',     False,  (0, 10),       "%0.2f"),
+        'coupling_coeff_pulse':               ('Coupling Coefficient',              '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],             'viridis',     False,  (0, 1),        "%0.2f"),
+        'stp_initial_50hz':                   ('Paired pulse STP',                  '',    1,    1,     [db.Dynamics.stp_initial_50hz],                    'bwr',         False,  (-0.5, 0.5),   "%0.2f"),
+        'stp_induction_50hz':                 ('← Facilitating  Depressing →',      '',    1,    1,     [db.Dynamics.stp_induction_50hz],                  'bwr',         False,  (-0.5, 0.5),   "%0.2f"),
+        'stp_recovery_250ms':                 ('← Over-recovered  Not recovered →', '',    1,    1,     [db.Dynamics.stp_recovery_250ms],                  'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'stp_recovery_single_250ms':          ('← Over-recovered  Not recovered →', '',    1,    1,     [db.Dynamics.stp_recovery_single_250ms],           'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'pulse_amp_first_50hz':               ('1st PSP Amplitude @ 50Hz',          '',    1e3,  1,     [db.Dynamics.pulse_amp_first_50hz],                'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'pulse_amp_stp_initial_50hz':         ('2nd PSP Amplitude @ 50Hz',          '',    1e3,  1,     [db.Dynamics.pulse_amp_stp_initial_50hz],          'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'pulse_amp_stp_induction_50hz':       ('PSP Amplitude STP induced @ 50Hz',  '',    1e3,  1,     [db.Dynamics.pulse_amp_stp_induction_50hz],        'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'pulse_amp_stp_recovery_single_250ms':('PSP Amplitude STP recovered @ 250ms','',   1e3,  1,     [db.Dynamics.pulse_amp_stp_recovery_single_250ms], 'bwr',         False,  (-1.5, 1.5),   "%0.2f"),
+        'paired_event_correlation_1_2_r':     ('Paired event correlation 1:2',      '',    1,    1,     [db.Dynamics.paired_event_correlation_1_2_r],      'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'paired_event_correlation_2_4_r':     ('Paired event correlation 2:4',      '',    1,    1,     [db.Dynamics.paired_event_correlation_2_4_r],      'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'paired_event_correlation_4_8_r':     ('Paired event correlation 4:8',      '',    1,    1,     [db.Dynamics.paired_event_correlation_4_8_r],      'bwr',         False,  (-0.2, 0.2),   "%0.2f"),
+        'junctional_conductance':             ('Junctional Conductance',            'nS',  1e9,  1,     [db.GapJunction.junctional_conductance],           'viridis',     False,  (0, 10),       "%0.2f"),
+        'coupling_coeff_pulse':               ('Coupling Coefficient',              '',    1,    1,     [db.GapJunction.coupling_coeff_pulse],             'viridis',     False,  (0, 1),        "%0.2f"),
+        'variability_resting_state':          ('log(Resting state aCV)',       '',    1,    1,     [db.Dynamics.variability_resting_state],           'viridis',     False,  (-1, 1),       "%0.2f"),
+        'variability_second_pulse_50hz':      ('log(second pulse aCV)',         '',    1,    1,    [db.Dynamics.variability_second_pulse_50hz],       'viridis',     False,  (-1, 1),       "%0.2f"),
+        'variability_stp_induced_state_50hz': ('log(STP induced aCV)',         '',    1,    1,     [db.Dynamics.variability_stp_induced_state_50hz],  'viridis',     False,  (-1, 1),       "%0.2f"),
     } 
     if metrics is None:
         metrics = synapse_metrics
@@ -320,7 +372,7 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
     post_classes = {pair_class[1].name: pair_class[1] for pair_class in pair_classes}
     pair_classes = ['%s→%s' % (pc[0], pc[1]) for pc in pair_classes]
     for i, metric in enumerate(metrics):
-        pairs_has_metric, metric_name, units, scale, _, _, _, _, _ = get_metric_data(metric, db, pre_classes=pre_classes, post_classes=post_classes, pair_query_args=pair_query_args)
+        pairs_has_metric, metric_name, units, scale, alpha, cmap, cmap_log, clim, cell_fmt = get_metric_data(metric, db, pre_classes=pre_classes, post_classes=post_classes, pair_query_args=pair_query_args)
         pairs_has_metric['pair_class'] = pairs_has_metric['pre_class'] + '→' + pairs_has_metric['post_class']
         pairs_has_metric = pairs_has_metric[pairs_has_metric['pair_class'].isin(pair_classes)]
         pairs_has_metric[metric] *= scale
@@ -331,9 +383,15 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         else:
             colors = palette
         c2 = [[c]*len(y_vals[i]) for i, c in enumerate(colors)]
-        x_vals = swarm(y_vals)
+        if cmap_log:
+            x_vals = swarm([[np.log(y) for y in group] for group in y_vals])
+            ax[i].set_yscale('log')
+        else:
+            x_vals = swarm(y_vals)
+            
+        plot = sns.barplot(x='pair_class', y=metric, data=pairs_has_metric, ax=ax[i], ci=None, 
+                           facecolor=(1, 1, 1, 0), edgecolor='black', order=pair_classes, estimator=estimator)
         ax[i].scatter(np.concatenate(x_vals), np.concatenate(y_vals), color=np.concatenate(c2), **plot_args)
-        plot = sns.barplot(x='pair_class', y=metric, data=pairs_has_metric, ax=ax[i], ci=None, facecolor=(1, 1, 1, 0), edgecolor='black', order=pair_classes, estimator=estimator)
         
         if i == len(metrics) - 1:
             ax[i].set_xlabel('pre→post class', size=12)
@@ -341,7 +399,7 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         else:
             ax[i].set_xlabel('')
             ax[i].set_xticklabels('')
-        label = metric_name + ' (%s)'%units
+        label = metric_name + (' (%s)'%units if units else '')
         label = '\n'.join(wrap(label, 20))
         ax[i].set_ylabel(label, size=10)
         ax[i].set_yticklabels([], minor=True)
@@ -359,14 +417,14 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
 def metric_stats(metric, db, pre_classes, post_classes, pair_query_args):
     pairs_has_metric, _, units, scale, _, _, _, _, _ = get_metric_data(metric, db, pre_classes=pre_classes, post_classes=post_classes, pair_query_args=pair_query_args)
     pairs_has_metric[metric] = pairs_has_metric[metric].apply(pd.to_numeric)*scale
-    summary = pairs_has_metric.groupby(['pre_class', 'post_class']).describe(percentiles=[0.5])
+    summary = pairs_has_metric.groupby(['pre_class', 'post_class']).describe(percentiles=[0.25, 0.5, 0.75])
     return summary[metric], units
 
 
 def ei_hist_plot(ax, metric, bin_edges, db, pair_query_args):
     ei_classes = {'ex': CellClass(cell_class='ex'), 'in': CellClass(cell_class='in')}
     
-    pairs_has_metric, metric_name, units, scale, _, _, _, _, _ = get_metric_data(metric, db, ei_classes, ei_classes, pair_query_args=pair_query_args)
+    pairs_has_metric, metric_name, units, scale, _, _, log_scale, _, _ = get_metric_data(metric, db, ei_classes, ei_classes, pair_query_args=pair_query_args)
     ex_pairs = pairs_has_metric[pairs_has_metric['pre_class']=='ex']
     in_pairs = pairs_has_metric[pairs_has_metric['pre_class']=='in']
     if 'amp' in metric:
@@ -392,7 +450,7 @@ def ei_hist_plot(ax, metric, bin_edges, db, pair_query_args):
     ax[0].spines['top'].set_visible(False)
     ax[1].spines['right'].set_visible(False)
     ax[1].spines['top'].set_visible(False)
-    ax[1].set_xlabel('%s (%s)' % (metric_name, units))
+    ax[1].set_xlabel(metric_name + (' (%s)'%units if units else ''))
     ax[1].set_ylabel('Number of Synapses', fontsize=12)
 
     #KS test
@@ -404,19 +462,13 @@ def ei_hist_plot(ax, metric, bin_edges, db, pair_query_args):
 
     return ex_pairs, in_pairs
 
-def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, pair_query_args=None, estimator=np.mean):
+def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, pair_query_args=None, estimator=np.mean, clim=None):
     if class_labels is None:
         class_labels = {key: key for key in pre_classes.keys()}
-    pairs_has_metric, metric_name, units, scale, alpha, cmap, cmap_log, clim, cell_fmt = get_metric_data(metric, db, pre_classes, post_classes, pair_query_args=pair_query_args)
+    pairs_has_metric, metric_name, units, scale, alpha, cmap, cmap_log, default_clim, cell_fmt = get_metric_data(metric, db, pre_classes, post_classes, pair_query_args=pair_query_args)
     metric_data = pairs_has_metric.groupby(['pre_class', 'post_class']).aggregate(lambda x: estimator(x))
     error = pairs_has_metric.groupby(['pre_class', 'post_class']).aggregate(lambda x: np.std(x))
     count = pairs_has_metric.groupby(['pre_class', 'post_class']).count()
-
-    cmap = matplotlib.cm.get_cmap(cmap)
-    if cmap_log:
-        norm = matplotlib.colors.LogNorm(vmin=clim[0], vmax=clim[1], clip=False)
-    else:
-        norm = matplotlib.colors.Normalize(vmin=clim[0], vmax=clim[1], clip=False)
 
     shape = (len(pre_classes), len(post_classes))
     data = np.zeros(shape)
@@ -436,22 +488,31 @@ def cell_class_matrix(pre_classes, post_classes, metric, class_labels, ax, db, p
             data[i, j] = value * scale
             data_str[i, j] = cell_fmt % (value * scale) if np.isfinite(value) else ""
             data_alpha[i, j] = 1-alpha*((std*scale)/np.sqrt(n)) if np.isfinite(value) else 0 
-            
+
     pre_labels = [class_labels[cls] for cls in pre_classes]
     post_labels = [class_labels[cls] for cls in post_classes]
+
+    clim = clim or default_clim
+    cmap = matplotlib.cm.get_cmap(cmap)
+    if cmap_log:
+        norm = matplotlib.colors.LogNorm(vmin=clim[0], vmax=clim[1], clip=False)
+    else:
+        norm = matplotlib.colors.Normalize(vmin=clim[0], vmax=clim[1], clip=False)
+
     mapper = matplotlib.cm.ScalarMappable(cmap=cmap, norm=norm)
     data_rgb = mapper.to_rgba(data)
     data_rgb[:,:,3] = np.clip(data_alpha, 0, 1)
 
-    im, cbar = heatmap(data_rgb, pre_labels, post_labels,
-                    ax=ax,
-                    ax_labels=('postsynaptic', 'presynaptic'),
-                    bg_color=(0.8, 0.8, 0.8),
-                    cmap=cmap,
-                    norm=norm,
-                    cbarlabel=metric_name,
-                    cbar_kw={'shrink':0.5, 'pad':0.02},
-                    )
+    im, cbar = heatmap(
+        data_rgb, pre_labels, post_labels,
+        ax=ax,
+        ax_labels=('postsynaptic', 'presynaptic'),
+        bg_color=(0.8, 0.8, 0.8),
+        cmap=cmap,
+        norm=norm,
+        cbarlabel=metric_name + (' (%s)'%units if units else ''),
+        cbar_kw={'shrink':0.5, 'pad':0.02},
+    )
 
     text = annotate_heatmap(im, data_str, data=data, fontsize=8)
 
@@ -559,7 +620,7 @@ def show_distance_profiles(ax, results, colors, class_labels):
     return ax
 
 
-def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=None, fit_label=None):
+def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=None, fit_label=None, show_labels=False):
     # where to bin connections for measuring connection probability
     x_bins = np.arange(0, 500e-6, 40e-6)
 
@@ -579,13 +640,14 @@ def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=Non
     tickheight = ymax / 10
     show_connectivity_raster(x_probed, conn, tickheight, ax)
 
-    # err = 0 if not hasattr(fit, 'fit_result') else fit.fit_result.fun
-    # label = "Fit pmax=%0.2f\nsize=%0.2f µm\nerr=%f" % (fit.pmax, fit.size*1e6, err)
-    # ax.text(0.99, 0.85, label, transform=ax.transAxes, color=(0.5, 0, 0), horizontalalignment='right')
-    
-    # if true_model is not None:
-    #     label = "True pmax=%0.2f\nsize=%0.2f µm" % (true_model.pmax, true_model.size*1e6)
-    #     ax.text(0.99, 0.95, label, transform=ax.transAxes, color=(0, 0.5, 0), horizontalalignment='right')
+    if show_labels is True:
+        err = 0 if not hasattr(fit, 'fit_result') else fit.fit_result.fun
+        label = "Fit pmax=%0.2f\nsize=%0.2f µm\nerr=%f" % (fit.pmax, fit.size*1e6, err)
+        ax.text(0.99, 0.85, label, transform=ax.transAxes, color=(0.5, 0, 0), horizontalalignment='right')
+        
+        if true_model is not None:
+            label = "True pmax=%0.2f\nsize=%0.2f µm" % (true_model.pmax, true_model.size*1e6)
+            ax.text(0.99, 0.95, label, transform=ax.transAxes, color=(0, 0.5, 0), horizontalalignment='right')
     
     ax.axhline(0, color=(0, 0, 0))
     set_distance_xticks(x_vals, ax)
@@ -595,6 +657,7 @@ def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=Non
     ax.set_yticklabels(['probed', 'connected'] + ['%0.1f'%x for x in y_vals])
     ax.set_ylim(-tickheight*2.6, ymax)
 
+
 def show_connectivity_fit(x_vals, fit, ax, color=(0.5, 0, 0), true_model=None, label=None):
     if true_model is not None:
         # plot the ground-truth probability distribution (solid green)
@@ -603,10 +666,12 @@ def show_connectivity_fit(x_vals, fit, ax, color=(0.5, 0, 0), true_model=None, l
     if label is not None:
         ax.legend()
 
+
 def show_distance_binned_cp(x_bins, cprop, ax, color=(0.5, 0.5, 0.5), ci_lower=None, ci_upper=None):
     ax.plot(x_bins, np.append(cprop, cprop[-1]), drawstyle='steps-post', color=color)
     if ci_lower is not None and ci_upper is not None:
         ax.fill_between(x_bins, np.append(ci_lower, ci_lower[-1]), np.append(ci_upper, ci_upper[-1]), step='post', facecolor=color + (0.3,))
+
 
 def show_connectivity_raster(x_probed, conn, tickheight, ax, color=(0, 0, 0), offset=2):
     # plot connections probed and found
@@ -616,11 +681,13 @@ def show_connectivity_raster(x_probed, conn, tickheight, ax, color=(0, 0, 0), of
     ax.eventplot(x_probed.copy(), lineoffsets=-tickheight*offset, linelengths=tickheight, color=(color + (alpha1,)))
     ax.eventplot(x_probed[conn], lineoffsets=-tickheight*(offset-1), linelengths=tickheight, color=(color + (alpha2,)))
 
+
 def set_distance_xticks(x_vals, ax, interval=50e-6):
     ax.set_xlabel('distance (µm)')
     xticks = np.arange(0, x_vals.max(), interval)
     ax.set_xticks(xticks)
     ax.set_xticklabels(['%0.0f'%(x*1e6) for x in xticks])
+
 
 def color_by_conn_prob(pair_group_keys, connectivity, norm, cmap):
     """ Return connection probability mapped color from show_connectivity_matrix
@@ -690,26 +757,46 @@ def data_matrix(data_df, cell_classes, metric=None, scale=1, unit=None, cmap=Non
     return data_rgb, data_str
 
 
-def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, color='k'):
+def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=False, scatter_args={}, line_args={}):
     qc_pass_data = stim_sorted_pulse_amp(pair)
 
     # scatter plots of event amplitudes sorted by pulse number 
     mask = qc_pass_data['induction_frequency'] == ind_f
-    filtered = qc_pass_data[mask]
+    filtered = qc_pass_data[mask].copy()
 
     sign = 1 if pair.synapse.synapse_type == 'ex' else -1
     try:
-        filtered['fit_amp'] *= sign * 1000
+        filtered['dec_fit_reconv_amp'] *= sign * 1000
     except KeyError:
         print('No fit amps for pair: %s' % pair)
-    ax.set_ylim(0, filtered['fit_amp'].max())
+    ax.set_ylim(0, filtered['dec_fit_reconv_amp'].max())
     ax.set_xlim(0, 13)
 
-    sns.swarmplot(x='pulse_number', y='fit_amp', data=filtered, color=(0.7, 0.7, 0.7), size=3, ax=ax)
+    scatter_opts = {'color': (0.7, 0.7, 0.7, ), 'size': 3}
+    scatter_opts.update(scatter_args)
+    sns.swarmplot(x='pulse_number', y='dec_fit_reconv_amp', data=filtered, ax=ax, **scatter_opts)
+    leg = ax.get_legend()
+    if leg is not None:
+        leg.remove()
+    
 
-    pulse_means = filtered.groupby('pulse_number').mean()['fit_amp'].to_list()
-    ax.plot(range(0,8), pulse_means[:8], color=color, linewidth=2, zorder=100)
-    ax.plot(range(8,12), pulse_means[8:12], color=color, linewidth=2, zorder=100)
+    line_opts = {'color': 'k', 'linewidth': 2, 'zorder': 100}
+    line_opts.update(line_args)
+    # plot a line at the average of all pulses of the same number
+    if avg_line:
+        pulse_means = filtered.groupby('pulse_number').mean()['dec_fit_reconv_amp'].to_list()
+        ax.plot(range(0,8), pulse_means[:8], **line_opts)
+        ax.plot(range(8,12), pulse_means[8:12], **line_opts)
+    # plot avg trace for each pulse number
+    if avg_trace:
+        for pulse_number in np.arange(1,13):
+            pulse_ids = filtered[filtered['pulse_number']==pulse_number]['id'].to_list()
+            prs = db.query(db.PulseResponse).filter(db.PulseResponse.id.in_(pulse_ids))
+            pr_list = PulseResponseList(prs)
+            post_trace = pr_list.post_tseries(align='spike', bsub=True, bsub_win=1e-3)
+            trace_mean = post_trace.mean()*1e3
+            trace_slice = trace_mean.time_slice(-1e-3, 8e-3)
+            ax.plot(trace_slice.time_values*1e2 + (pulse_number-1.4), abs(trace_slice.data),  **line_opts)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
@@ -795,3 +882,25 @@ def compose_svg_figure(figure_spec, filename, size, display=False):
         from IPython.display import SVG, display
         display(SVG(filename=filename))
 
+
+def make_scatter_legend(ax, values, cmap, norm, label_formatter, title, 
+                        color=None, markersize=10, linewidth=0, markeredgewidth=0,
+                        loc='upper left', bbox_to_anchor=(1, 1), marker='o',
+                        **kwds):
+    if isinstance(cmap, str):
+        cmap = matplotlib.cm.get_cmap(cmap)
+
+    legend_elements = []
+    for x in values:
+        legend_elements.append(matplotlib.lines.Line2D(
+            [0], [0], marker=marker, color=color, linewidth=linewidth, markeredgewidth=markeredgewidth,
+            label=label_formatter(x), markerfacecolor=cmap(norm(x)), markersize=markersize,
+        ))
+
+    return ax.legend(
+        handles=legend_elements, 
+        loc=loc, 
+        title=title,
+        bbox_to_anchor=bbox_to_anchor,
+        **kwds
+    )

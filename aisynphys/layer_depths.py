@@ -158,8 +158,16 @@ def get_layer_depths(point, layer_polys, pia_path, wm_path, depth_interp, dx_int
         }
     return out
 
+def resample_line(coords, distance_delta=80):
+    line = LineString(coords)
+    distances = np.arange(0, line.length, distance_delta)
+    points = [line.interpolate(distance) for distance in distances] + [line.boundary[1]]
+    line_coords = [point.coords[0] for point in points]
+    return line_coords
+
 def get_depths_slice(focal_plane_image_series_id, soma_centers, species,
-                     resolution=1, step_size=2.0, max_iter=1000):
+                     resolution=1, step_size=2.0, max_iter=1000,
+                     ignore_pia_wm=True):
 
     errors = []
     # if resolution is not set, can run in pixel coordinates but some default scales may be off
@@ -169,8 +177,9 @@ def get_depths_slice(focal_plane_image_series_id, soma_centers, species,
         focal_plane_image_series_id=focal_plane_image_series_id))
     parser.args.pop('log_level')
     # fully ignore pia/wm, rarely present and often incomplete if present
-    parser.args['pia_surface'] = None
-    parser.args['wm_surface'] = None
+    if ignore_pia_wm:
+        parser.args['pia_surface'] = None
+        parser.args['wm_surface'] = None
     parser.args['multipolygon_error_threshold'] = 10
     
     layer_names = [layer['name'] for layer in parser.args['layer_polygons']]
@@ -178,9 +187,18 @@ def get_depths_slice(focal_plane_image_series_id, soma_centers, species,
         raise ValueError("Duplicate layer names.")
     output = run_snap_polygons(**parser.args)
 
-    layers, _, _ = layer_info_from_snap_polygons_output(output, resolution)
+    layers, pia_path, wm_path = layer_info_from_snap_polygons_output(output, resolution)
     try:
-        top_path, bottom_path, pia_extra_dist, wm_extra_dist = get_missing_layer_info(layers, species)
+        if (pia_path is None) or (wm_path is None):
+            top_path, bottom_path, pia_extra_dist, wm_extra_dist = get_missing_layer_info(layers, species)
+        if pia_path is not None:
+            top_path = pia_path
+            pia_extra_dist = 0
+        if wm_path is not None:
+            bottom_path = wm_path
+            wm_extra_dist = 0
+        top_path = resample_line(top_path)
+        bottom_path = resample_line(bottom_path)
 
         (_, _, _, mesh_coords, mesh_values, mesh_gradients) = generate_laplace_field(
                 top_path,

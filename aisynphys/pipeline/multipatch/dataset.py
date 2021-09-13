@@ -1,19 +1,16 @@
-import os, glob, re, time, struct, hashlib
+import os, struct, hashlib
 import numpy as np
-from datetime import datetime
 from collections import OrderedDict
-from ... import config, lims, qc
+from ... import config, qc
 from ...util import timestamp_to_datetime, datetime_to_timestamp
 from ...data import Experiment
 from .pipeline_module import MultipatchPipelineModule
 from .experiment import ExperimentPipelineModule
 from neuroanalysis.baseline import float_mode
 from neuroanalysis.data import PatchClampRecording
-from ...data import Experiment, MultiPatchDataset, MultiPatchProbe, MultiPatchMixedFreqTrain, MultiPatchSyncRecAnalyzer
+from ...data import Experiment, MultiPatchProbe, MultiPatchMixedFreqTrain, MultiPatchSyncRecAnalyzer
 from neuroanalysis.analyzers.stim_pulse import PatchClampStimPulseAnalyzer
 from neuroanalysis.analyzers.baseline import BaselineDistributor
-from neuroanalysis.util.optional_import import optional_import
-getDirHandle = optional_import('acq4.util.DataManager', 'getDirHandle')
 
 
 class DatasetPipelineModule(MultipatchPipelineModule):
@@ -208,7 +205,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
             mpa = MultiPatchSyncRecAnalyzer(srec)
             for pre_dev in srec.devices:
                 for post_dev in srec.devices:
-                    if pre_dev == post_dev:
+                    if pre_dev == post_dev or pre_dev not in all_pulse_entries:
                         continue
 
                     # get all responses, regardless of the presence of a spike
