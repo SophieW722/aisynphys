@@ -2,9 +2,14 @@ from __future__ import division, print_function
 
 import os, sys, argparse
 import six
-from aisynphys.database import default_db as db
+from aisynphys.database import create_default_db
 from aisynphys.config import synphys_db
 from aisynphys import config
+
+
+# initialize DB without schema checks since we are likely to be handling incomplete or
+# non-existent databases here.
+db = create_default_db(check_schema=False)
 
 
 parser = argparse.ArgumentParser(parents=[config.parser])
