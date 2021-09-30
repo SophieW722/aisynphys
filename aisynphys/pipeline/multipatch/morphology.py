@@ -165,16 +165,29 @@ class MorphologyPipelineModule(MultipatchPipelineModule):
 def hash_record(rec):
     return hashlib.md5(repr(rec).encode()).hexdigest()
 
-def import_morpho_db():
-    import pyodbc
-    cnxn_str = r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)}; DBQ=%s' % config.morpho_address
-    cnxn = pyodbc.connect(cnxn_str)
-    cursor = cnxn.cursor()
-    morpho_table = cursor.execute('select * from MPATCH_CellsofCluster')
-    results = morpho_table.fetchall()
-    fields = [r[0] for r in results[0].cursor_description]
-    morpho_results = {int(r.cell_specimen_id): {k:getattr(r, k) for k in fields} for r in results}
+# As of 10/1/2021 we no longer have access to this Database. Will now pull from csv file export of this DB 
+# deposited by someone in morphology into \\allen\programs\celltypes\workgroups\synphys\morphology
+# def import_morpho_db():
+#     import pyodbc
+#     cnxn_str = r'DRIVER={Microsoft Access Driver (*.mdb, *.accdb)}; DBQ=%s' % config.morpho_address
+#     cnxn = pyodbc.connect(cnxn_str)
+#     cursor = cnxn.cursor()
+#     morpho_table = cursor.execute('select * from MPATCH_CellsofCluster')
+#     results = morpho_table.fetchall()
+#     fields = [r[0] for r in results[0].cursor_description]
+#     morpho_results = {int(r.cell_specimen_id): {k:getattr(r, k) for k in fields} for r in results}
     
+#     return morpho_results
+
+def import_morpho_db():
+    import pandas as pd
+    morpho_path = config.morpho_address
+    morpho_files = [os.path.join(morpho_path, file) for file in os.listdir(morpho_path) if os.path.splitext(file)[-1]=='.csv']
+    mod_time = {os.path.getmtime(file): file for file in morpho_files}
+    most_recent = max(mod_time.keys())
+    morpho_df = pd.read_csv(mod_time[most_recent]).set_index('cell_specimen_id')
+    morpho_results = morpho_df.to_dict(orient='index')
+
     return morpho_results
 
 morpho_cache = None
