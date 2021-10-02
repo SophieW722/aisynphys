@@ -100,11 +100,12 @@ class SynphysDatabase(Database):
         db = SynphysDatabase.load_sqlite(db_file, readonly=True)
         return db
 
-    def __init__(self, ro_host, rw_host, db_name):
+    def __init__(self, ro_host, rw_host, db_name, check_schema=True):
         from .schema import ORMBase
         Database.__init__(self, ro_host, rw_host, db_name, ORMBase)
         self._project_names = None
-        self._check_version()
+        if check_schema:
+            self._check_version()
 
     @property
     def version_name(self):

@@ -12,21 +12,18 @@ class NoDatabase:
         raise self.exception
 
 
-# initialize a default database connection if configured or requested via CLI
-def init_default_db():
-    global default_db
+def create_default_db(**kwds):
+    """Create a SynphysDatabase using the synphys_db and synphys_db_host config options.
+    """
     if config.synphys_db_host is None:
-        default_db = NoDatabase(Exception("No database was specified in config.synphys_db_host or with CLI flags --db-version or --db-host"))
-    else:
-        if config.synphys_db_host.startswith('postgres'):
-            default_db_name = '{database}_{version}'.format(database=config.synphys_db, version=SynphysDatabase.schema_version)
-        else:
-            default_db_name = config.synphys_db
+        raise Exception("No database was specified in config.synphys_db_host or with CLI flags --db-version or --db-host")
 
-        try:
-            default_db = SynphysDatabase(config.synphys_db_host, config.synphys_db_host_rw, default_db_name)
-        except Exception as exc:
-            default_db = NoDatabase(exc)
+    if config.synphys_db_host.startswith('postgres'):
+        db_name = '{database}_{version}'.format(database=config.synphys_db, version=SynphysDatabase.schema_version)
+    else:
+        db_name = config.synphys_db
+
+    return SynphysDatabase(config.synphys_db_host, config.synphys_db_host_rw, db_name, **kwds)
 
 
 def dispose_all_engines():
@@ -37,4 +34,8 @@ def dispose_all_engines():
     Database.dispose_all_engines()
 
 
-init_default_db()
+# initialize a default database connection if configured or requested via CLI
+try:
+    default_db = create_default_db()
+except Exception as exc:
+    default_db = NoDatabase(exc)
