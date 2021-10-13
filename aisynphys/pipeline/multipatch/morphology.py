@@ -186,6 +186,7 @@ def import_morpho_db():
     mod_time = {os.path.getmtime(file): file for file in morpho_files}
     most_recent = max(mod_time.keys())
     morpho_df = pd.read_csv(mod_time[most_recent]).set_index('cell_specimen_id')
+    morpho_df = morpho_df.where(pd.notnull(morpho_df), None)
     morpho_results = morpho_df.to_dict(orient='index')
 
     return morpho_results
