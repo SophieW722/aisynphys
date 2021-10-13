@@ -620,9 +620,10 @@ def show_distance_profiles(ax, results, colors, class_labels):
     return ax
 
 
-def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=None, fit_label=None, show_labels=False):
+def show_connectivity_profile(x_probed, conn, ax, fit=None, true_model=None, ymax=None, fit_label=None, show_labels=False, x_bins=None):
     # where to bin connections for measuring connection probability
-    x_bins = np.arange(0, 500e-6, 40e-6)
+    if x_bins is None:
+        x_bins = np.arange(0, 500e-6, 40e-6)
 
     # where to sample models
     #x_vals = 0.5 * (x_bins[1:] + x_bins[:-1])
@@ -634,8 +635,9 @@ def show_connectivity_profile(x_probed, conn, ax, fit, true_model=None, ymax=Non
 
     if ymax is None:
         ymax = upper.max()
-    
-    show_connectivity_fit(x_vals, fit, ax, true_model=true_model, label=fit_label)
+
+    if fit is not None:
+        show_connectivity_fit(x_vals, fit, ax, true_model=true_model, label=fit_label)
 
     tickheight = ymax / 10
     show_connectivity_raster(x_probed, conn, tickheight, ax)
