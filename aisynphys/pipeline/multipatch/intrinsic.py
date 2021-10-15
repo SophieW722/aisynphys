@@ -44,7 +44,7 @@ class IntrinsicPipelineModule(MultipatchPipelineModule):
         for cell in expt.cell_list:
             dev_id = cell.electrode.device_id
             recording_dict = get_intrinsic_recording_dict(expt.data, dev_id)
-            for rec_list in recording_dict.keys():
+            for rec_list in recording_dict.values():
                 qc_recordings(expt, rec_list)
             
             lp_results, error = get_long_square_features(recording_dict['LP'], cell_id=cell.id)
@@ -54,12 +54,12 @@ class IntrinsicPipelineModule(MultipatchPipelineModule):
             # Write new record to DB
             
             results = {
-                'chirp_peak_freq': chirp_results['peak_freq'],
-                'chirp_3db_freq': chirp_results['3db_freq'],
-                'chirp_peak_ratio': chirp_results['peak_ratio'],
-                'chirp_peak_impedance': chirp_results['peak_impedance'] * 1e9, #unscale from mV/pA,
-                'chirp_sync_freq': chirp_results['sync_freq'],
-                'chirp_inductive_phase': chirp_results['total_inductive_phase'],
+                'chirp_peak_freq': chirp_results.get('peak_freq', np.nan),
+                'chirp_3db_freq': chirp_results.get('3db_freq', np.nan),
+                'chirp_peak_ratio': chirp_results.get('peak_ratio', np.nan),
+                'chirp_peak_impedance': chirp_results.get('peak_impedance', np.nan) * 1e9, #unscale from mV/pA,
+                'chirp_sync_freq': chirp_results.get('sync_freq', np.nan),
+                'chirp_inductive_phase': chirp_results.get('total_inductive_phase', np.nan),
                 
                 'rheobase': lp_results.get('rheobase_i', np.nan) * 1e-12, #unscale from pA,
                 'fi_slope': lp_results.get('fi_fit_slope', np.nan) * 1e-12, #unscale from pA,
