@@ -38,7 +38,7 @@ def get_chirp_features(recordings, cell_id=''):
     except FeatureError as exc:
         logger.warning(f'Error processing chirps for cell {cell_id}: {str(exc)}')
         errors.append('Error processing chirps for cell %s: %s' % (cell_id, str(exc)))
-        results = {}
+        chirp_features = {}
     
     return chirp_features, errors
 
