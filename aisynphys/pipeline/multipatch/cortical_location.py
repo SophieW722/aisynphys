@@ -32,7 +32,8 @@ class CortexLocationPipelineModule(DatabasePipelineModule):
         
         results, cell_errors = get_depths_slice(image_series_id, soma_centers,
                                                 species=expt.slice.species,
-                                                resolution=image_series_resolution)
+                                                resolution=image_series_resolution,
+                                                ignore_pia_wm=True)
         if len(results)==0:
             errors.append("No cells passed depth calculation.")
             errors.extend(cell_errors)

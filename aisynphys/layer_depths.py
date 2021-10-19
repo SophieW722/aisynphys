@@ -106,22 +106,12 @@ def get_layer_depths(point, layer_polys, pia_path, wm_path, depth_interp, dx_int
         for layer in sorted(in_layer):
             if not layer=="Layer1":
                 start_layer = layer
-        logging.warning(f"Overlapping layers: {in_layer}. Choosing {start_layer}")
+        logger.warning(f"Overlapping layers: {in_layer}. Choosing {start_layer}")
     layer_poly = layer_polys[start_layer]
     
     pia_direction = np.array([dx_interp(point), dy_interp(point)])
     pia_direction /= np.linalg.norm(pia_direction)
     
-    if not ('pia_surface' in layer_poly and 'wm_surface' in layer_poly):
-        # top or bottom layer without pia/wm surfaces drawn, can't get depths
-        # guess pia_direction from nearest valid point (interp does automatically)
-        # TODO: could maybe get rough depths by following paths to opposite surface
-        out = {
-            'position':point,
-            'layer':start_layer,
-            'pia_direction':pia_direction,
-            }
-        return out
     def dist_to_boundary(boundary_path, direction):
         try:
             _, dist = ld.step_from_node(
@@ -132,13 +122,25 @@ def get_layer_depths(point, layer_polys, pia_path, wm_path, depth_interp, dx_int
             logger.warning(e)
             dist = np.nan
         return dist
-    
-    pia_path = ensure_linestring(pia_path)
-    wm_path = ensure_linestring(wm_path)
-    pia_side_dist = dist_to_boundary(layer_poly['pia_surface'], 1)
-    wm_side_dist = dist_to_boundary(layer_poly['wm_surface'], -1)
-    pia_distance = dist_to_boundary(pia_path, 1)
-    wm_distance = dist_to_boundary(wm_path, -1)
+
+    if pia_path is not None:
+        pia_path = ensure_linestring(pia_path)
+        pia_distance = dist_to_boundary(pia_path, 1)
+    else:
+        pia_distance = np.nan
+    if wm_path is not None:
+        wm_path = ensure_linestring(wm_path)
+        wm_distance = dist_to_boundary(wm_path, -1)
+    else:
+        wm_distance = np.nan
+    if 'pia_surface' in layer_poly:
+        pia_side_dist = dist_to_boundary(layer_poly['pia_surface'], 1)
+    else:
+        pia_side_dist = dist_to_boundary(layer_poly['bounds'].boundary, 1)
+    if 'wm_surface' in layer_poly:
+        wm_side_dist = dist_to_boundary(layer_poly['wm_surface'], -1)
+    else:
+        wm_side_dist = dist_to_boundary(layer_poly['bounds'].boundary, -1)
     pia_distance += pia_extra_dist
     wm_distance += wm_extra_dist
 
@@ -158,7 +160,7 @@ def get_layer_depths(point, layer_polys, pia_path, wm_path, depth_interp, dx_int
         }
     return out
 
-def resample_line(coords, distance_delta=80):
+def resample_line(coords, distance_delta=50):
     line = LineString(coords)
     distances = np.arange(0, line.length, distance_delta)
     points = [line.interpolate(distance) for distance in distances] + [line.boundary[1]]
@@ -169,7 +171,6 @@ def get_depths_slice(focal_plane_image_series_id, soma_centers, species,
                      resolution=1, step_size=2.0, max_iter=1000,
                      ignore_pia_wm=True):
 
-    errors = []
     # if resolution is not set, can run in pixel coordinates but some default scales may be off
     soma_centers = {cell: resolution*np.array(position) for cell, position in soma_centers.items()}
 
@@ -188,6 +189,12 @@ def get_depths_slice(focal_plane_image_series_id, soma_centers, species,
     output = run_snap_polygons(**parser.args)
 
     layers, pia_path, wm_path = layer_info_from_snap_polygons_output(output, resolution)
+    return get_depths_from_processed_layers(layers, pia_path, wm_path, soma_centers, species,
+                                            step_size=step_size, max_iter=max_iter)
+
+def get_depths_from_processed_layers(layers, pia_path, wm_path, soma_centers, species,
+                                     step_size=2.0, max_iter=1000):
+    errors = []
     try:
         if (pia_path is None) or (wm_path is None):
             top_path, bottom_path, pia_extra_dist, wm_extra_dist = get_missing_layer_info(layers, species)
@@ -209,10 +216,11 @@ def get_depths_slice(focal_plane_image_series_id, soma_centers, species,
         dx_interp = interp(mesh_coords, mesh_gradients[:,0])
         dy_interp = interp(mesh_coords, mesh_gradients[:,1])
     except LayerDepthError as exc:
-        top_path = bottom_path = pia_extra_dist = wm_extra_dist = None
+        top_path = bottom_path = None
+        pia_extra_dist = wm_extra_dist = np.nan
         depth_interp = dx_interp = dy_interp = lambda x: np.nan
         logger.error(exc)
-        errors.append(exc)
+        errors.append(str(exc))
 
     outputs = {}
     for name, point in soma_centers.items():
