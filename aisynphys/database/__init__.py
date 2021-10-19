@@ -9,7 +9,7 @@ class NoDatabase:
     def __init__(self, exception):
         self.exception = exception
     def __getattr__(self, attr):
-        raise self.exception
+        raise Exception("Cannot access default databse.") from self.exception
 
 
 def create_default_db(**kwds):
