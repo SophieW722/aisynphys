@@ -9,6 +9,7 @@ debug problems more easily.
 import os, sys, time, argparse
 from datetime import datetime, timedelta
 from collections import OrderedDict
+import aisynphys.config
 
 
 def delay(hour=2):
@@ -27,6 +28,7 @@ if __name__ == '__main__':
     stages = OrderedDict([
         ('pre_update_report',   ('daily',  'python util/analysis_pipeline.py multipatch all --report', 'pre-update pipeline report')),
         ('backup_notes',        ('daily',  'pg_dump -d data_notes -h 10.128.36.109 -U postgres  > data_notes_backups/data_notes_%s.pgsql'%date, 'backup data notes DB')),
+        ('backup_morphology',   ('daily',  f'rsync {aisynphys.config.morpho_address}/* morphology_backups/', 'backup morphology DB')),
         ('sync',                ('daily',  'python util/sync_rigs_to_server.py', 'sync raw data to server')),
         ('patchseq_report',     ('daily',  'python util/patchseq_reports.py --daily', 'patchseq report')),
         ('pipeline',            ('daily',  'python util/analysis_pipeline.py multipatch all --update --retry', 'run analysis pipeline')),

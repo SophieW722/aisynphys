@@ -509,7 +509,7 @@ class Database(object):
         """
         return self.ro_engine.table_names()
 
-    def create_tables(self, tables=None):
+    def create_tables(self, tables=None, initialize=True):
         """Create tables in the database from the ORM base specification.
         
         A list of the names of *tables* may be optionally specified to 
@@ -521,6 +521,18 @@ class Database(object):
             tables = [meta_tables[t] for t in tables]
         self.ormbase.metadata.create_all(bind=self.rw_engine, tables=tables)
         self.grant_readonly_permission()
+
+        if initialize:
+            self.initialize_database()
+
+    def initialize_database(self):
+        """Optionally called after create_tables. 
+
+        Initialize is _not_ called when cloning databases.
+
+        Default does nothing; subclasses may override.
+        """
+        pass
 
     def drop_tables(self, tables=None):
         """Drop a list of tables (or all ORM-defined tables, if no list is given) from this database.
@@ -600,7 +612,7 @@ class Database(object):
                 raise Exception("Destination database %s already exists." % dest_db)
 
         dest_db.create_database()
-        dest_db.create_tables()
+        dest_db.create_tables(initialize=False)
         
         for table in self.iter_copy_tables(self, dest_db, **kwds):
             pass
@@ -616,44 +628,52 @@ class Database(object):
         read_session = source_db.session(readonly=True)
         write_session = dest_db.session(readonly=False)
         
-        for table_name, table in source_db.metadata_tables().items():
-            if (table_name in skip_tables) or (tables is not None and table_name not in tables):
-                print("Skipping %s.." % table_name)
-                continue
-            print("Cloning %s.." % table_name)
-            
-            # read from table in background thread, write to table in main thread.
-            skip_cols = skip_columns.get(table_name, [])
-            reader = TableReadThread(source_db, table, skip_columns=skip_cols)
-            i = 0
-            for i,rec in enumerate(reader):
-                try:
-                    # Note: it is allowed to write `rec` directly back to the db, but
-                    # in some cases (json columns) we run into a sqlalchemy bug. Converting
-                    # to dict first is a workaround.
-                    rec = {k:getattr(rec, k) for k in rec.keys()}
-                    
-                    write_session.execute(table.insert(rec))
-                except Exception:
-                    if skip_errors:
-                        print("Skip record %d:" % i)
-                        sys.excepthook(*sys.exc_info())
-                    else:
-                        raise
-                if i%1000 == 0:
-                    print("%d/%d   %0.2f%%\r" % (i, reader.max_id, (100.0*(i+1.0)/reader.max_id)), end="")
-                    sys.stdout.flush()
-                
-            print("   committing %d rows..                    " % i)
-            write_session.commit()
-            read_session.rollback()
-            
-            yield table_name
+        try:
+            if dest_db.backend == 'postgres':
+                # disables some consistency checks to allow easier replication
+                write_session.execute("SET session_replication_role = 'replica';")
 
-        if vacuum:
-            print("Optimizing database..")
-            dest_db.vacuum()
-        print("All finished!")
+            for table_name, table in source_db.metadata_tables().items():
+                if (table_name in skip_tables) or (tables is not None and table_name not in tables):
+                    print("Skipping %s.." % table_name)
+                    continue
+                print("Cloning %s.." % table_name)
+                
+                # read from table in background thread, write to table in main thread.
+                skip_cols = skip_columns.get(table_name, [])
+                reader = TableReadThread(source_db, table, skip_columns=skip_cols)
+                i = 0
+                for i,rec in enumerate(reader):
+                    try:
+                        # Note: it is allowed to write `rec` directly back to the db, but
+                        # in some cases (json columns) we run into a sqlalchemy bug. Converting
+                        # to dict first is a workaround.
+                        rec = {k:getattr(rec, k) for k in rec.keys()}
+                        
+                        write_session.execute(table.insert(rec))
+                    except Exception:
+                        if skip_errors:
+                            print("Skip record %d:" % i)
+                            sys.excepthook(*sys.exc_info())
+                        else:
+                            raise
+                    if i%1000 == 0:
+                        print("%d/%d   %0.2f%%\r" % (i, reader.max_id, (100.0*(i+1.0)/reader.max_id)), end="")
+                        sys.stdout.flush()
+                    
+                print("   committing %d rows..                    " % i)
+                write_session.commit()
+                read_session.rollback()
+                
+                yield table_name
+
+            if vacuum:
+                print("Optimizing database..")
+                dest_db.vacuum()
+            print("All finished!")
+        finally:
+            if dest_db.backend == 'postgres':
+                write_session.execute("SET session_replication_role = 'origin';")
 
 
 class DBQuery(sqlalchemy.orm.Query):
