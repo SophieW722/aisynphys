@@ -3,7 +3,6 @@ from __future__ import division, print_function
 import os, sys, argparse
 import six
 from aisynphys.database import create_default_db
-from aisynphys.config import synphys_db
 from aisynphys import config
 
 
