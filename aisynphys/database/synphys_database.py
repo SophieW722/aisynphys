@@ -119,13 +119,9 @@ class SynphysDatabase(Database):
         """
         return os.path.split(self.db_name)[-1]
 
-    def create_tables(self, tables=None):
-        """This method is used when initializing a new database or new tables within an existing database.
-
-        Extends :func:`Database.create_tables` to include an extra `Metadata` table.
+    def initialize_database(self):
+        """Optionally called after create_tables        
         """
-        Database.create_tables(self, tables=tables)
-        
         # initialize or verify db version
         mrec = self.metadata_record()
         if mrec is None:
