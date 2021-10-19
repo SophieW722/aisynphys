@@ -455,6 +455,7 @@ class Database(object):
             if os.path.isfile(self.db_name):
                 os.remove(self.db_name)
         elif self.backend == 'postgresql':
+            self.dispose_all_engines()
             engine = self.maint_engine
             with engine.begin() as conn:
                 conn.connection.set_isolation_level(0)
