@@ -105,7 +105,13 @@ class SynphysDatabase(Database):
         Database.__init__(self, ro_host, rw_host, db_name, ORMBase)
         self._project_names = None
         if check_schema:
-            self._check_version()
+            try:
+                self._check_version()
+            except Exception:
+                # need to clean up carefully since this can introduce a persistent connection
+                self.default_session.rollback()
+                self.dispose_engines()
+                raise
 
     @property
     def version_name(self):
