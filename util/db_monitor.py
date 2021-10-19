@@ -109,8 +109,7 @@ def check():
                 state = '[%s %0.1fhr]' % (con['state'], con['idle_time'] / 3600.)
             
             query = con['query'].replace('\n', ' ')[:110]
-            
-            print("          {:15s} {:15s} {:45s} {:6d} {:16s} {:s}   ".format(con['usename'], con['datname'], app[-45:], con['pid'], state, query))
+            print("          {:15s} {:15s} {:45s} {:6d} {:16s} {:s}   ".format(str(con['usename']), str(con['datname']), str(app[-45:]), con['pid'], str(state), str(query)))
     
 
 class ScreenPrint(object):
@@ -162,7 +161,7 @@ if __name__ == '__main__':
         
     if args.kill or args.terminate:
         to_kill = list_db_connections()
-        to_kill = [c for c in to_kill if c['idle_time']/3600. > args.kill_age]
+        to_kill = [c for c in to_kill if c['idle_time'] is not None and c['idle_time']/3600. > args.kill_age]
         if args.kill_from is not None:
             to_kill = [c for c in to_kill if args.kill_from in (c['user'], c['client_addr'], c['hostname'])]
         print("%s processes: %s" % ('kill' if not args.terminate else 'terminate', to_kill))
