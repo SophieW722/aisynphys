@@ -74,6 +74,7 @@ PatchClampRecording = make_table(
         ('baseline_rms_noise', 'float', 'RMS noise of the steady-state part of the recording'),
         ('nearest_test_pulse_id', 'test_pulse.id', 'ID of the test pulse that was recorded closest to this recording (and possibly embedded within the recording)'),
         ('qc_pass', 'bool', 'Indicates whether this recording passes a minimal ephys QC', {'index': True}),
+        ('access_adj_baseline_potential', 'float', 'VC command adjusted for access resistance')
     ]
 )
 
@@ -110,6 +111,7 @@ TestPulse = make_table(
         ('input_resistance', 'float'),
         ('capacitance', 'float'),
         ('time_constant', 'float'),
+        ('access_resistance_lowpass', 'float', 'lowpass filtered access resistance to remove artifacts')
     ]
 )
 
