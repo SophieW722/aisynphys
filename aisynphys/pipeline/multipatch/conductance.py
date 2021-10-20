@@ -11,8 +11,7 @@ from sklearn.linear_model import LinearRegression
 class ConductancePipelineModule(MultipatchPipelineModule):
     """ Measure the effective conductance of a chemical synapse using reversal potential calculated from VC.
     Additionally calculate the predicted psp amplitude at the target holding potential for that connection type,
-    -55 mV for inhibitory connections and -70 mV for excitatory. Currently this is limited to monosynaptic responses
-    and updates synapse.reversal_potential, synapse.effective_conductance, and synapse.adj_psp_amplitude.
+    -55 mV for inhibitory connections and -70 mV for excitatory. Currently this is limited to monosynaptic responses.
     """
 
     name = 'conductance'
