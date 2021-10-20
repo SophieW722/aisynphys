@@ -140,15 +140,15 @@ def pulse_response_qc_pass(post_rec, window, n_spikes, adjacent_pulses):
         [failures[k].append('Spikes detected within 8ms of the response window') for k in failures.keys()]
 
     # Check holding potential is appropriate for each sign
-    ex_limits = [-85e-3, -45e-3]
-    in_limits = [-60e-3, -45e-3]
+    ex_limits = [-85e-3, -50e-3]
+    in_limits = [-60e-3, -50e-3]
     # check both baseline_potential (which is measured over all baseline regions in the recording)
     # and *base_potential*, which is just the median value over the IC pre_pulse window or VC command
     
     if not (ex_limits[0] < base_potential < ex_limits[1]): 
-        failures['ex'].append('Response window baseline of %s is outside of bounds [-85mV, -45mV]' % si_format(base_potential, suffix='V'))
+        failures['ex'].append('Response window baseline of %s is outside of bounds [-85mV, -50mV]' % si_format(base_potential, suffix='V'))
     if not (in_limits[0] < base_potential < in_limits[1]): 
-        failures['in'].append('Response window baseline of %s is outside of bounds [-60mV, -45mV]' % si_format(base_potential, suffix='V'))
+        failures['in'].append('Response window baseline of %s is outside of bounds [-60mV, -50mV]' % si_format(base_potential, suffix='V'))
     
     base2 = post_rec.baseline_potential
     if base2 is None:
@@ -156,9 +156,9 @@ def pulse_response_qc_pass(post_rec, window, n_spikes, adjacent_pulses):
         failures['in'].append('Unknown baseline potential for this recording')
     else:
         if not (ex_limits[0] < base2 < ex_limits[1]):
-            failures['ex'].append('Recording baseline of %s is outside of bounds [-85mV, -45mV]' % si_format(base2, suffix='V'))
+            failures['ex'].append('Recording baseline of %s is outside of bounds [-85mV, -50mV]' % si_format(base2, suffix='V'))
         if not (in_limits[0] < base2 < in_limits[1]):
-            failures['in'].append('Recording baseline of %s is outside of bounds [-60mV, -45mV]' % si_format(base2, suffix='V'))
+            failures['in'].append('Recording baseline of %s is outside of bounds [-60mV, -50mV]' % si_format(base2, suffix='V'))
     
     
     ex_qc_pass = len(failures['ex'])==0 
