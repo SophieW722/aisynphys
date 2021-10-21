@@ -74,7 +74,7 @@ PatchClampRecording = make_table(
         ('baseline_rms_noise', 'float', 'RMS noise of the steady-state part of the recording'),
         ('nearest_test_pulse_id', 'test_pulse.id', 'ID of the test pulse that was recorded closest to this recording (and possibly embedded within the recording)'),
         ('qc_pass', 'bool', 'Indicates whether this recording passes a minimal ephys QC', {'index': True}),
-        ('access_adj_baseline_potential', 'float', 'VC command adjusted for access resistance')
+        ('access_adj_baseline_potential', 'float', 'Baseline membrane potential estimated by adjusting VC command for access resistance'),
     ]
 )
 
@@ -103,15 +103,15 @@ TestPulse = make_table(
     columns=[
         ('electrode_id', 'electrode.id', 'ID of the electrode on which this test pulse was recorded.', {'index': True}), 
         ('recording_id', 'recording.id', 'ID of the recording that contains this test pulse, if any.', {'index': True}),
-        ('start_index', 'int'),
-        ('stop_index', 'int'),
-        ('baseline_current', 'float'),
-        ('baseline_potential', 'float'),
-        ('access_resistance', 'float'),
-        ('input_resistance', 'float'),
-        ('capacitance', 'float'),
-        ('time_constant', 'float'),
-        ('access_resistance_lowpass', 'float', 'lowpass filtered access resistance to remove artifacts')
+        ('start_index', 'int', 'Index into recording where test pulse begins'),
+        ('stop_index', 'int', 'Index into recording where test pulse ends'),
+        ('baseline_current', 'float', 'Pipette current immediately before test pulse'),
+        ('baseline_potential', 'float', 'Membrane potential immediately before test pulse'),
+        ('access_resistance', 'float', 'Access resistance estimated from test pulse'),
+        ('input_resistance', 'float', 'Membrane input resistance estimated from test pulse'),
+        ('capacitance', 'float', 'Membrane capacitance estimated from test pulse'),
+        ('time_constant', 'float', 'Decay time constant of exponential fit to test pulse'),
+        ('access_resistance_lowpass', 'float', 'median access resistance of nearby test pulses (to filter out artifacts)'),
     ]
 )
 
