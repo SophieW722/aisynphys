@@ -14,6 +14,7 @@ from .gap_junction import GapJunctionPipelineModule
 from .intrinsic import IntrinsicPipelineModule
 from .cortical_location import CortexLocationPipelineModule
 from .synapse_model import SynapseModelPipelineModule
+from .conductance import ConductancePipelineModule
 
 
 class MultipatchPipeline(Pipeline):
@@ -31,6 +32,7 @@ class MultipatchPipeline(Pipeline):
         GapJunctionPipelineModule,
         PulseResponsePipelineModule,
         RestingStatePipelineModule,
+        ConductancePipelineModule,
         DynamicsPipelineModule,
         CortexLocationPipelineModule,
         SynapseModelPipelineModule,

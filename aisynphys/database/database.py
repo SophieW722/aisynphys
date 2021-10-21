@@ -55,6 +55,13 @@ class NDArray(TypeDecorator):
     def python_type(self):
         return np.ndarray
 
+class CustomEncoder(json.JSONEncoder):
+    """ For encoding nonserializable floats into json
+    """
+    def default(self, obj):
+        if isinstance(obj, np.floating):
+            return float(obj)
+        return json.JSONEncoder.default(self, obj)
 
 class JSONObject(TypeDecorator):
     """For marshalling objects in/out of json-encoded text.
@@ -63,7 +70,7 @@ class JSONObject(TypeDecorator):
     hashable = False
     
     def process_bind_param(self, value, dialect):
-        return json.dumps(value)
+        return json.dumps(value, cls=CustomEncoder)
         
     def process_result_value(self, value, dialect):
         if value is None:
