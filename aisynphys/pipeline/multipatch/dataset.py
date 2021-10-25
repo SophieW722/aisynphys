@@ -1,4 +1,4 @@
-import os, struct, hashlib
+import os, struct, hashlib, scipy
 import numpy as np
 from collections import OrderedDict
 from ... import config, qc
@@ -57,6 +57,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
             
             rec_entries = {}
             all_pulse_entries = {}
+            tp_entries = []
             for rec in srec.recordings:
                 if rec.aborted:
                     # skip incomplete recordings
@@ -71,6 +72,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                     stim_name=(None if rec.stimulus is None else rec.stimulus.description),
                     stim_meta=(None if rec.stimulus is None else rec.stimulus.save()),
                 )
+                
                 session.add(rec_entry)
                 rec_entries[rec.device_id] = rec_entry
                 
@@ -108,7 +110,8 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                     )
                     session.add(tp_entry)
                     pcrec_entry.nearest_test_pulse = tp_entry
-                    
+                    tp_entries.append(tp_entry)
+
                 # import information about STP protocol
                 if not isinstance(rec, (MultiPatchProbe, MultiPatchMixedFreqTrain)):
                     continue
@@ -174,6 +177,19 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                             # pulse.first_spike = spike_entry
                             pulse.first_spike_time = spike_entry.max_slope_time
             
+            # lowpass filter access resistance and then go back through the recs to fill in for test_pulse
+            tp_access_r = np.asarray([tp.access_resistance for tp in tp_entries if tp.access_resistance is not None])
+            if len(tp_access_r) > 1: 
+                lowpass_ras = scipy.ndimage.median_filter(tp_access_r, 5, mode='nearest')
+                for tp_entry, lowpass_ra in zip(tp_entries, lowpass_ras):
+                    tp_entry.access_resistance_lowpass = lowpass_ra
+
+                    # calculate adjusted Vm in VC in patch_clamp_recording
+                    pcr = tp_entry.recording.patch_clamp_recording
+                    if pcr.clamp_mode=='vc':
+                        adjusted_baseline = pcr.baseline_potential - lowpass_ra * tp.baseline_current
+                        pcr.access_adj_baseline_potential = adjusted_baseline
+
             if not srec_has_mp_probes:
                 continue
 
