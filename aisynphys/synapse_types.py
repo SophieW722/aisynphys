@@ -116,12 +116,12 @@ def synapse_query(db=default_db):
     """
     q = db.pair_query(
         synapse=True, 
-        project_name=['mouse V1 coarse matrix', 'mouse V1 pre-production', 'human coarse matrix'], 
+        project_name=['mouse V1 coarse matrix', 'mouse V1 pre-production', 'human coarse matrix'],
     )
     pre_cell = q.pre_cell
     post_cell = q.post_cell
     q = (q
-        .join(db.SynapseModel)
+    #    .join(db.SynapseModel)
         .add_entity(db.Synapse)
         .add_entity(db.Dynamics)
         .add_column(pre_cell.cre_type.label('pre_cre_type'))
@@ -144,7 +144,7 @@ def load_data(query=None, data_fields=default_data_fields):
     if query is None:
         query = synapse_query()
 
-    synapses = query.dataframe()
+    synapses = query.dataframe(rename_columns=False)
     syn_data = synapses[data_fields].copy()
 
     return syn_data.set_index(['experiment_ext_id', 'pre_ext_id', 'post_ext_id'])
