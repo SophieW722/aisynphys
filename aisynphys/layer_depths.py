@@ -223,6 +223,7 @@ def get_depths_from_processed_layers(layers, pia_path, wm_path, soma_centers, sp
         errors.append(str(exc))
 
     outputs = {}
+    cell_errors = {}
     for name, point in soma_centers.items():
         try:
             outputs[name] = get_layer_depths(
@@ -233,7 +234,9 @@ def get_depths_from_processed_layers(layers, pia_path, wm_path, soma_centers, sp
         except (LayerDepthError,) as exc:
             error = f"Failure getting depth info for cell {name}: {exc}"
             logger.error(error)
-            errors.append(error)
-            
-    return outputs, errors
+            cell_errors[name] = str(exc)
+    if ((len(layers) >= 3) | ((pia_path is not None) & (wm_path is not None))):
+        if len(soma_centers) == len(cell_errors):
+            raise ValueError(f"All cells in slice failed unexpectedly: {cell_errors}")
+    return outputs, errors, cell_errors
 
