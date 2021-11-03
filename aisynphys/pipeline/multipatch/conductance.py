@@ -7,6 +7,7 @@ from .synapse import SynapsePipelineModule
 from .pulse_response import PulseResponsePipelineModule
 from .resting_state import RestingStatePipelineModule
 from sklearn.linear_model import LinearRegression
+from ...avg_response_fit import sort_responses
 
 class ConductancePipelineModule(MultipatchPipelineModule):
     """ Measure the effective conductance of a chemical synapse using reversal potential calculated from VC.
@@ -31,14 +32,17 @@ class ConductancePipelineModule(MultipatchPipelineModule):
 
             # get qc-pass responses in VC at both holding potentials (ie ex_qc_pass and in_qc_pass)
             # require that both holding potentials be present to calculate reversal
-            ex_qc_pass_vc = vc_pr_query(pair, db, session).filter(db.PulseResponse.ex_qc_pass==True).all()
-            in_qc_pass_vc = vc_pr_query(pair, db, session).filter(db.PulseResponse.in_qc_pass==True).all()
+            vc_pulses = vc_pr_query(pair, db, session).all()
+            
+            sorted_vc_pulses = sort_responses(vc_pulses)
+            qc_pass_70 = sorted_vc_pulses[('vc', -70)]['qc_pass']
+            qc_pass_55 = sorted_vc_pulses[('vc', -55)]['qc_pass']
 
-            if len(ex_qc_pass_vc) < 1 or len(in_qc_pass_vc) < 1:
+            if len(qc_pass_70) < 1 or len(qc_pass_55) < 1:
                 continue
             
-            pulse_responses = ex_qc_pass_vc + in_qc_pass_vc
-            adj_baseline = np.array([pr.recording.patch_clamp_recording.access_adj_baseline_potential for pr in pulse_responses])
+            pulse_responses = qc_pass_70 + qc_pass_55
+            adj_baseline = np.array([pr.recording.patch_clamp_recording.access_adj_baseline_potential for pr in pulse_responses if pr.pulse_response_fit is not None])
             pr_amps = np.array([pr.pulse_response_fit.fit_amp for pr in pulse_responses if pr.pulse_response_fit is not None]) 
             if len(adj_baseline) < 1 or len(pr_amps) < 1:
                 continue
@@ -69,6 +73,7 @@ class ConductancePipelineModule(MultipatchPipelineModule):
                 rec.target_holding_potential = target_holding
                 rec.adj_psp_amplitude = adj_psp_amplitude
                 rec.effective_conductance = eff_cond
+                rec.avg_baseline_potential = avg_baseline_potential
             
             session.add(rec)
 
@@ -91,4 +96,5 @@ def vc_pr_query(pair, db, session):
     q = q.join(db.PatchClampRecording, db.PulseResponse.recording_id==db.PatchClampRecording.recording_id)
     q = q.filter(db.PulseResponse.pair_id==pair.id)
     q = q.filter(db.PatchClampRecording.clamp_mode=='vc')
+   
     return q

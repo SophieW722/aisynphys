@@ -289,6 +289,7 @@ class SynphysDatabase(Database):
             .outerjoin(self.Dynamics, self.Dynamics.pair_id==self.Pair.id)
             .outerjoin(self.RestingStateFit, self.RestingStateFit.synapse_id==self.Synapse.id)
             .outerjoin(self.SynapseModel, self.SynapseModel.pair_id==self.Pair.id)
+            .outerjoin(self.Conductance, self.Conductance.synapse_id==self.Synapse.id)
             # .outerjoin(self.PolySynapse)
             # .outerjoin(self.GapJunction)
         )

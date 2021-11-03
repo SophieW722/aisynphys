@@ -14,7 +14,8 @@ Conductance = make_table(
         ('effective_conductance', 'float', 'Effective conductance measured in IC from VC reversal potential'),
         ('adj_psp_amplitude', 'float', 'Resting state psp amplitude adjusted to the target holding potential'),
         ('reversal_potential', 'float', 'Reversal potential calculated from VC'),
-        ('target_holding_potential', 'float', 'Target holding potential; -55 mV for inhibitory, -70 mV for excitatory')
+        ('target_holding_potential', 'float', 'Target holding potential; -55 mV for inhibitory, -70 mV for excitatory'),
+        ('avg_baseline_potential', 'float', 'Average measured baseline potential in IC from qc-pass resting state pulses')
     ]
 )
 
