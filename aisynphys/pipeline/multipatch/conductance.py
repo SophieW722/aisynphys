@@ -70,7 +70,7 @@ class ConductancePipelineModule(MultipatchPipelineModule):
                 target_holding = -55e-3 if pair.synapse.synapse_type == 'in' else -70e-3
                 adj_psp_amplitude = eff_cond * target_holding - eff_cond * reversal # y = m * x(target_voltage) + b, b = -m * x2 (reversal)
 
-                rec.target_holding_potential = target_holding
+                rec.ideal_holding_potential = target_holding
                 rec.adj_psp_amplitude = adj_psp_amplitude
                 rec.effective_conductance = eff_cond
                 rec.avg_baseline_potential = avg_baseline_potential

@@ -12,9 +12,11 @@ Conductance = make_table(
     columns=[
         ('synapse_id', 'synapse.id', 'The ID of the entry in the synapse table to which these results apply', {'index': True}),
         ('effective_conductance', 'float', 'Effective conductance measured in IC from VC reversal potential'),
-        ('adj_psp_amplitude', 'float', 'Resting state psp amplitude adjusted to the target holding potential'),
+        ('adj_psp_amplitude', 'float', 'Resting state psp amplitude adjusted to ideal_holding_potential'),
         ('reversal_potential', 'float', 'Reversal potential calculated from VC'),
-        ('target_holding_potential', 'float', 'Target holding potential; -55 mV for inhibitory, -70 mV for excitatory'),
+        ('ideal_holding_potential', 'float', 'The holding potential used to calculate adj_psp_amplitude such that measurements of \
+                                                of strength could be compared across connections at different measured baseline potentials. \
+                                                For inhibitory connections this value is -55 mV, for excitatory connections -70 mV.'),
         ('avg_baseline_potential', 'float', 'Average measured baseline potential in IC from qc-pass resting state pulses')
     ]
 )
