@@ -24,10 +24,9 @@ def delay(hour=2):
 
 
 if __name__ == '__main__':
-    date = datetime.today().strftime("%Y-%m-%d")
     stages = OrderedDict([
         ('pre_update_report',   ('daily',  'python util/analysis_pipeline.py multipatch all --report', 'pre-update pipeline report')),
-        ('backup_notes',        ('daily',  f'docker exec `docker ps -aq -f name=synphys-postgres` pg_dump -U postgres data_notes  > data_notes_backups/data_notes_{date}.pgsql', 'backup data notes DB')),
+        ('backup_notes',        ('daily',  'docker exec `docker ps -aq -f name=synphys-postgres` pg_dump -U postgres data_notes  > data_notes_backups/data_notes_{date}.pgsql', 'backup data notes DB')),
         ('backup_morphology',   ('daily',  f'rsync {aisynphys.config.morpho_address}/* morphology_backups/', 'backup morphology DB')),
         ('sync',                ('daily',  'python util/sync_rigs_to_server.py', 'sync raw data to server')),
         ('patchseq_report',     ('daily',  'python util/patchseq_reports.py --daily', 'patchseq report')),
@@ -60,7 +59,8 @@ if __name__ == '__main__':
                 continue
                 
             time_str = time.strftime('%Y-%m-%d %H:%M')
-            full_cmd = cmd + " 2>&1 | tee -a " + logfile
+            date_str = datetime.today().strftime("%Y-%m-%d")
+            full_cmd = cmd.format(date=date_str) + " 2>&1 | tee -a " + logfile
             msg = ("======================================================================================\n" 
                    "    [%s]  %s\n"
                    "    %s\n"
