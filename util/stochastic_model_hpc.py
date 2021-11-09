@@ -4,6 +4,7 @@ Script for submitting stochastic release model jobs to Moab
 import os, subprocess, re
 from aisynphys.database import default_db as db
 import aisynphys.config
+from aisynphys.stochastic_release_model import model_result_cache_path
 
 
 def optint(x):
@@ -74,7 +75,7 @@ conda_path = base_path + '/miniconda3'
 log_path = base_path + '/log'
 
 aisynphys_path = os.path.split(aisynphys.__file__)[0]
-cache_path = os.path.join(aisynphys.config.cache_path, 'stochastic_model_results')
+cache_path = model_result_cache_path()
 
 for d in [cache_path, log_path, aisynphys_path, conda_path]:
     assert os.path.isdir(d), f'Missing path: {d}'

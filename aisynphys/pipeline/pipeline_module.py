@@ -35,9 +35,11 @@ class PipelineModule(object):
     
     """    
     
-    name = None
-    dependencies = []
-    maxtasksperchild = None
+    name = None               # string name of this module subclass
+    dependencies = []         # module classes that this module subclass depends on 
+    maxtasksperchild = None   # max number of tasks a child process can handle before it should be killed
+    max_workers = None        # max number of parallel workers to use when running this moule
+    allow_parallel = True     # allow this module to run in parallel subprocesses
 
     def __init__(self, pipeline):
         self.pipeline = pipeline
@@ -152,12 +154,17 @@ class PipelineModule(object):
             
             run_jobs.append(job)
             
-        if parallel:
+        if parallel and self.allow_parallel:
             # kill DB connections before forking multiple processes
             database.dispose_all_engines()
             
             logger.info("Processing %d jobs (parallel)..", len(run_jobs))
             ctx = multiprocessing.get_context('spawn')  # Fork kills!
+            if workers is None:
+                workers = multiprocessing.cpu_count()
+            if self.max_workers is not None:
+                workers = min(workers, self.max_workers)
+
             pool = ctx.Pool(processes=workers, maxtasksperchild=self.maxtasksperchild)
             try:
                 # would like to just call self._run_job, but we can't pass a method to Pool.map()
