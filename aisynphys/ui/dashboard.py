@@ -634,10 +634,13 @@ class ExperimentMetadata(Experiment):
             submitted = False
             connections = None
             ignore = False
+            chosen_path = None
             for path in search_paths:
                 if path is not None and os.path.exists(path):
                     chosen_path = path
                     break
+            if chosen_path is None:
+                raise Exception('Experiment not found in any path: ' + str(search_paths))
             yml_file = os.path.join(chosen_path, 'pipettes.yml')
             ignore_file = os.path.join(chosen_path, 'ignore.txt')
             ignore = os.path.exists(ignore_file)

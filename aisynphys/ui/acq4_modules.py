@@ -1,5 +1,5 @@
-import acq4.pyqtgraph as pg
-from acq4.pyqtgraph.Qt import QtCore, QtGui
+import pyqtgraph as pg
+import acq4.util.Qt as Qt
 from acq4.modules.Module import Module
 from acq4.Manager import getManager
 import acq4.util.DataManager as DataManager
@@ -43,7 +43,7 @@ class MultipatchSubmissionModule(Module):
         self.ui.resize(1600, 900)
         self.ui.show()
         
-        self.load_from_dm_btn = QtGui.QPushButton("load from data manager")
+        self.load_from_dm_btn = Qt.QPushButton("load from data manager")
         self.ui.left_layout.insertWidget(0, self.load_from_dm_btn)
         self.load_from_dm_btn.clicked.connect(self.load_from_dm_clicked)
         
@@ -68,7 +68,7 @@ class NWBViewerModule(Module):
         self.ui.resize(1600, 900)
         self.ui.show()
         
-        self.load_from_dm_btn = QtGui.QPushButton("load from data manager")
+        self.load_from_dm_btn = Qt.QPushButton("load from data manager")
         self.ui.vsplit.insertWidget(0, self.load_from_dm_btn)
         self.load_from_dm_btn.clicked.connect(self.load_from_dm_clicked)
         
@@ -81,15 +81,15 @@ class NWBViewerModule(Module):
         return self.ui
 
 
-class MultiPatchMosaicEditorExtension(QtGui.QWidget):
+class MultiPatchMosaicEditorExtension(Qt.QWidget):
     def __init__(self, mosaic_editor):
         self.mosaic_editor = mosaic_editor
 
-        QtGui.QWidget.__init__(self)
-        self.layout = QtGui.QGridLayout()
+        Qt.QWidget.__init__(self)
+        self.layout = Qt.QGridLayout()
         self.setLayout(self.layout)
 
-        self.load_btn = QtGui.QPushButton("Download 20x")
+        self.load_btn = Qt.QPushButton("Download 20x")
         self.layout.addWidget(self.load_btn, 0, 0)
         self.load_btn.clicked.connect(self.load_clicked)
 
@@ -253,8 +253,8 @@ class MultiPatchMosaicEditorExtension(QtGui.QWidget):
         x_pos = all([cell['coordinates_20x']['x'] == 0 for cell in self.data['cells']])
         y_pos = all([cell['coordinates_20x']['y'] == 0 for cell in self.data['cells']])
         if x_pos is True or y_pos is True:
-            ret = QtGui.QMessageBox.question(self, "Position Check", "x and/or y position values for all cells are 0.\n"
-                "Do you still want to submit?", QtGui.QMessageBox.Ok | QtGui.QMessageBox.Cancel)
+            ret = Qt.QMessageBox.question(self, "Position Check", "x and/or y position values for all cells are 0.\n"
+                "Do you still want to submit?", Qt.QMessageBox.Ok | Qt.QMessageBox.Cancel)
             # postionValueMsg = QMessageBox()
             # postionValueMsg.setText('x and/or y position values are 0')
             # positionValueMsg.setInformativeText('Do you still want to submit?')
@@ -262,7 +262,7 @@ class MultiPatchMosaicEditorExtension(QtGui.QWidget):
 
             # answer = positionValueMsg.exec_()
 
-            if ret == QtGui.QMessageBox.Cancel:
+            if ret == Qt.QMessageBox.Cancel:
                 raise Exception ('Submission Cancelled')
         
     def save_json_and_trigger(self):
@@ -319,7 +319,7 @@ class DashboardModule(Module):
 
     def __init__(self, manager, name, config):
         Module.__init__(self, manager, name, config)
-        self.ui = dashboard.Dashboard(limit=config.get('limit', None), filter_defaults=config.get('filters', None))
+        self.ui = dashboard.Dashboard(limit=config.get('limit', 0), filter_defaults=config.get('filters', None))
         self.ui.resize(1600, 900)
         self.ui.show()
         
@@ -339,7 +339,7 @@ class VoltageImagingAnalysisModule(Module):
         self.ui.resize(1600, 900)
         self.ui.show()
         
-        self.load_from_dm_btn = QtGui.QPushButton("load from data manager")
+        self.load_from_dm_btn = Qt.QPushButton("load from data manager")
         self.ui.layout.addWidget(self.load_from_dm_btn, self.ui.layout.rowCount(), 0)
         self.load_from_dm_btn.clicked.connect(self.load_from_dm_clicked)
         
@@ -364,7 +364,7 @@ class VoltageImagingAnalysis2Module(Module):
         self.ui.resize(1600, 900)
         self.ui.show()
         
-        self.load_from_dm_btn = QtGui.QPushButton("load from data manager")
+        self.load_from_dm_btn = Qt.QPushButton("load from data manager")
         self.load_from_dm_btn.setParent(self.ui)
         self.load_from_dm_btn.resize(160, 30)
         self.load_from_dm_btn.show()
@@ -419,8 +419,8 @@ class PatchSeqMetadata(MetadataField):
                 'Seal': pg.ComboBox(items=['','GS','LS','NS','TF','NA']),
                 'Reporter': pg.ComboBox(items=['','red', 'green', 'yellow', '-', 'NA']),
                 'Nucleus': pg.ComboBox(items=['','+', '-', '?']),
-                'End Seal': pg.QtGui.QCheckBox(''),
-                'Tube ID': pg.QtGui.QLineEdit(),
+                'End Seal': pg.Qt.QCheckBox(''),
+                'Tube ID': pg.Qt.QLineEdit(),
                 }
 
                 for name, w in self.widgets.items():
