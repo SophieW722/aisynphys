@@ -415,11 +415,12 @@ class DatabasePipelineModule(PipelineModule):
         meta = job.get('meta', None)
         
         session = db.session(readonly=False)
-        # drop old pipeline job record
-        session.query(db.Pipeline).filter(db.Pipeline.job_id==job_id).filter(db.Pipeline.module_name==cls.name).delete()
-        session.commit()
         
         try:
+            # drop old pipeline job record
+            session.query(db.Pipeline).filter(db.Pipeline.job_id==job_id).filter(db.Pipeline.module_name==cls.name).delete()
+            session.commit()
+
             errors = cls.create_db_entries(job, session)
             if errors is None:
                 errors = []

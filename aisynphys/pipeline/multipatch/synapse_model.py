@@ -71,11 +71,13 @@ class SynapseModelPipelineModule(MultipatchPipelineModule):
         q = db.pair_query(synapse=True)
         q = q.add_columns(
             db.Experiment.ext_id.label('expt_ext_id'),
+            db.Experiment.project_name,
             q.pre_cell.ext_id.label('pre_ext_id'),
             q.post_cell.ext_id.label('post_ext_id'),
         )
         synapses = q.all()
-        pair_ids = set([" ".join([syn.expt_ext_id, syn.pre_ext_id, syn.post_ext_id]) for syn in synapses])
+        enabled_projects = ['human coarse matrix', 'mouse V1 coarse matrix', 'mouse V1 pre-production']
+        pair_ids = set([" ".join([syn.expt_ext_id, syn.pre_ext_id, syn.post_ext_id]) for syn in synapses if syn.project_name in enabled_projects])
 
         ready = OrderedDict()
         for pair_id in pair_ids:

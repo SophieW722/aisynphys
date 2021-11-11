@@ -957,6 +957,8 @@ class StochasticModelRunner:
 
         # get individual event amplitudes
         amplitudes = events['dec_fit_reconv_amp'].to_numpy().astype(float)
+        if np.isfinite(amplitudes).sum() == 0:
+            raise Exception("No event amplitudes available for this synapse.")
         
         # filter events by inhibitory or excitatory qc
         qc_field = syn_type + '_qc_pass'
