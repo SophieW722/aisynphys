@@ -942,7 +942,7 @@ class StochasticModelRunner:
             raise Exception("No events found for this synapse.")
 
         rec_times = (events['rec_start_time'] - events['rec_start_time'].iloc[0]).dt.total_seconds().to_numpy()
-        spike_times = events['first_spike_time'].to_numpy() + rec_times
+        spike_times = events['first_spike_time'].to_numpy().astype(float) + rec_times
         
         # some metadata to follow the events around--not needed for the model, but useful for 
         # analysis later on.
