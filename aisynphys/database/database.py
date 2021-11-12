@@ -19,7 +19,7 @@ from distutils.version import LooseVersion
 if LooseVersion(sqlalchemy.__version__) < '1.2':
     raise Exception('requires at least sqlalchemy 1.2')
 
-import sqlalchemy.inspection
+import sqlalchemy.inspection, sqlalchemy.pool
 from sqlalchemy import create_engine, Column, Integer, BigInteger, String, Boolean, Float, Date, DateTime, LargeBinary, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship, deferred, sessionmaker, reconstructor
@@ -235,8 +235,8 @@ class Database(object):
         # default options for creating DB engines
         self._engine_opts = {
             'postgresql': {
-                'ro': {'echo': False, 'pool_size': 10, 'max_overflow': 40, 'isolation_level': 'AUTOCOMMIT'},
-                'rw': {'pool_size': 10, 'max_overflow': 40},
+                'ro': {'echo': False, 'poolclass': sqlalchemy.pool.NullPool, 'isolation_level': 'AUTOCOMMIT'}, # {'pool_size': 0, 'max_overflow': 40, }
+                'rw': {'poolclass': sqlalchemy.pool.NullPool}, #{'pool_size': 0, 'max_overflow': 40},
             }
         }
 
@@ -396,7 +396,7 @@ class Database(object):
         self._check_engines()
         if self._maint_engine is None:
             if self.backend == 'postgresql':
-                opts = {'pool_size': 10, 'max_overflow': 40}
+                opts = {'poolclass': sqlalchemy.pool.NullPool, 'pool_size': 0, 'max_overflow': 40}
             else:
                 # maybe just return rw engine for postgres?
                 raise Exception("no maintenance connection for DB %s" % self)

@@ -10,13 +10,12 @@ from collections import OrderedDict
 import numpy as np
 from ...dynamics import generate_pair_dynamics
 from .pipeline_module import MultipatchPipelineModule
-from .experiment import ExperimentPipelineModule
+from .pulse_response import PulseResponsePipelineModule
 from neuroanalysis.util.optional_import import optional_import
-list_cached_results, load_cache_file, StochasticReleaseModel = optional_import(
+list_cached_results, load_cache_file, StochasticReleaseModel, StochasticModelRunner = optional_import(
     'aisynphys.stochastic_release_model', 
-    ['list_cached_results', 'load_cache_file', 'StochasticReleaseModel']
-    )
-from ...util import datetime_to_timestamp, timestamp_to_datetime
+    ['list_cached_results', 'load_cache_file', 'StochasticReleaseModel', 'StochasticModelRunner']
+)
 from .dynamics import generate_pair_dynamics
 
 
@@ -24,20 +23,22 @@ class SynapseModelPipelineModule(MultipatchPipelineModule):
     """Summarizes stochastic model outputs for each synapse
     """
     name = 'synapse_model'
-    dependencies = [ExperimentPipelineModule]
+    dependencies = [PulseResponsePipelineModule]
     table_group = ['synapse_model']
+    max_workers = 1  # model runner is already parallel
+    maxtasksperchild = 1
+    allow_parallel = False
     
     @classmethod
     def create_db_entries(cls, job, session):
         logger = logging.getLogger(__name__)
         db = job['database']
         job_id = job['job_id']
-        if job['meta'] is not None and 'source' in job['meta']:
-            cache_file = job['meta']['source']
-        else:
-            cache_file = cached_results()[job_id][0]
         
         logger.debug("Processing job %s", job_id)
+
+        # make sure model has run successfully for this pair
+        cache_file = get_model_cache_file(job_id, db)
 
         entry = make_model_result_entry(job_id, db, session, cache_file)
 
@@ -61,13 +62,9 @@ class SynapseModelPipelineModule(MultipatchPipelineModule):
         """
         logger = logging.getLogger(__name__)
 
-        # find all cached model results and check mtime
-        results = cached_results()
-        logger.info(f"Found {len(results)} model cache files")
-
-        # when did each experiment pipeline job finish? (when pair entries were created)
+        # when did each pulse response pipeline job finish?
         db = self.database
-        pair_pipeline_jobs = db.query(db.Pipeline).filter(db.Pipeline.module_name=='experiment').all()
+        pair_pipeline_jobs = db.query(db.Pipeline).filter(db.Pipeline.module_name=='pulse_response').all()
         pair_job_timestamps = {job.job_id: job.finish_time for job in pair_pipeline_jobs if job.success}
 
         # get pair IDs of all known synapses
@@ -81,16 +78,12 @@ class SynapseModelPipelineModule(MultipatchPipelineModule):
         pair_ids = set([" ".join([syn.expt_ext_id, syn.pre_ext_id, syn.post_ext_id]) for syn in synapses])
 
         ready = OrderedDict()
-        for pair_id, (cache_file, mtime) in results.items():
-            if pair_id not in pair_ids:
-                logger.warn(f"Skipping cached model result for pair {pair_id} not in DB ({cache_file})")
-                continue
-
-            # take the latter of cache file mtime and the pipeline run time for the pair
+        for pair_id in pair_ids:
             expt_id, _, _ = pair_id.split(' ')
-            dep_time = max(timestamp_to_datetime(mtime), pair_job_timestamps[expt_id] ) 
-
-            ready[pair_id] = {'dep_time': dep_time, 'meta': {'source': cache_file}}
+            if expt_id not in pair_job_timestamps:
+                continue
+            dep_time = pair_job_timestamps[expt_id]
+            ready[pair_id] = {'dep_time': dep_time}
         return ready
 
 
@@ -109,6 +102,28 @@ def cached_results():
         _all_results[pair_id] = (cache_file, mtime)
     
     return _all_results
+
+
+def get_model_cache_file(pair_id, db):
+    """Ensure that the model has been run for pair_id and return the cache file.
+    """
+    global _all_results
+    model_results = cached_results()
+    if pair_id in model_results:
+        return model_results[pair_id][0]
+    else:
+        # try running model
+        experiment_id, pre_cell_id, post_cell_id = pair_id.split(' ')
+        result = StochasticModelRunner(
+            db, experiment_id, pre_cell_id, post_cell_id,
+            workers=None,  # default uses all cpus
+            save_cache=True,
+            load_cache=False,
+        )
+        result.param_space  # force model run
+        _all_results = None
+
+        return result.cache_file
 
 
 def make_model_result_entry(pair_id, db, session, model_cache_file):
