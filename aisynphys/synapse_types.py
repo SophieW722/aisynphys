@@ -271,8 +271,10 @@ def run_umap_pipeline(data, mapper, features):
 def show_umap(data, ax, title=None, legend_title=None, picking=True, **kwds):
     """Default styling and convenience features for generating umap scatter plots.
     """
-    x, y = 'umap-0', 'umap-1'
+    return show_scatter(data, 'umap-0', 'umap-1', ax, title=None, legend_title=None, picking=True, **kwds)
 
+
+def show_scatter(data, x, y, ax, title=None, legend_title=None, picking=True, **kwds):
     opts = dict(
         x=x, y=y,
         linewidth=0,
