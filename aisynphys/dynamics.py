@@ -14,8 +14,8 @@ def sorted_pulse_responses(pr_recs):
     sorted_recs : dict
         Nested dictionary structure with keys [(clamp_mode, ind_freq, recovery_delay)][recording][pulse_number]::
             {('ic', 50.0, 250e-3): {
-                rec1: {1:pr, 2:pr, 3:pr, ...}, 
-                rec2: {1:pr, 2:pr, 3:pr, ...}, 
+                rec1: {0:pr, 1:pr, 2:pr, ...}, 
+                rec2: {0:pr, 1:pr, 2:pr, ...}, 
                 ...},
             ...}
          
@@ -26,7 +26,7 @@ def sorted_pulse_responses(pr_recs):
     
         pr_recs = pulse_response_query(pair).all()
         sorted = sorted_pulse_responses(pr_recs)
-        prs = [d[1] for d in sorted['ic', 50, 250e-3].values()]
+        prs = [d[0] for d in sorted['ic', 50, 250e-3].values()]
     """
 
     # group records by (clamp mode, ind_freq, rec_delay), recording, and then by pulse number
@@ -138,7 +138,7 @@ def generate_pair_dynamics(pair, db, session, pr_recs=None):
     }
 
     paired_pulse_ratio = []
-    # caclulate dynamics for all frequencie and recovery delays
+    # caclulate dynamics for all frequencies and recovery delays
     #   [(clamp_mode, ind_freq, recovery_delay), {'stp_induction':(mean, std, n),
     #       'stp_initial': (mean, std, n), 'stp_recovery': (mean, std, n)}), ...]
     all_metrics = []
@@ -168,44 +168,44 @@ def generate_pair_dynamics(pair, db, session, pr_recs=None):
             amps = {k:getattr(r.PulseResponseFit, amp_field) for k,r in pulses.items()}
 
             # calculate metrics if the proper conditions are met
-            if 1 in pulses:
+            if 0 in pulses:
                 if ind_freq == 50:
-                    col_metrics['pulse_amp_first_50hz'].append(amps[1])
-            if 1 in pulses and 2 in pulses:
-                initial = (amps[2] - amps[1]) / amp_90p
+                    col_metrics['pulse_amp_first_50hz'].append(amps[0])
+            if 0 in pulses and 1 in pulses:
+                initial = (amps[1] - amps[0]) / amp_90p
                 collect_initial.append(initial)
                 # we separate out 50Hz into its own column because the induction frequency spans
                 # multiple recovery delays
                 if ind_freq == 50:
                     col_metrics['stp_initial_50hz'].append(initial)
-                    col_metrics['pulse_amp_stp_initial_50hz'].append(amps[2])
-                    if amps[1] != 0:
-                        paired_pulse_ratio.append(amps[2] / amps[1])
-            if all([k in pulses for k in [1,6,7,8]]):
-                induction_amp = np.median([amps[6], amps[7], amps[8]])
-                induction = (induction_amp - amps[1]) / amp_90p
+                    col_metrics['pulse_amp_stp_initial_50hz'].append(amps[1])
+                    if amps[0] != 0:
+                        paired_pulse_ratio.append(amps[1] / amps[0])
+            if all([k in pulses for k in [0,5,6,7]]):
+                induction_amp = np.median([amps[5], amps[6], amps[7]])
+                induction = (induction_amp - amps[0]) / amp_90p
                 collect_induction.append(induction)
                 if ind_freq == 50:
                     col_metrics['stp_induction_50hz'].append(induction)
                     col_metrics['pulse_amp_stp_induction_50hz'].append(induction_amp)
-            if delay is not None and all([k in pulses for k in range(1,13)]):
-                recovery_amp = np.median([amps[i] for i in range(9,13)])
-                r = [amps[i+8] - amps[i] for i in range(1,5)]
+            if delay is not None and all([k in pulses for k in range(0,12)]):
+                recovery_amp = np.median([amps[i] for i in range(8,12)])
+                r = [amps[i+8] - amps[i] for i in range(0,4)]
                 recovery = np.median(r) / amp_90p
                 collect_recovery.append(recovery)
                 if delay == 250e-3:
                     col_metrics['stp_recovery_250ms'].append(recovery)
                     col_metrics['pulse_amp_stp_recovery_250ms'].append(recovery_amp)
-            if delay is not None and all([k in pulses for k in range(1,10)]):
-                r = amps[9] - amps[1]
+            if delay is not None and all([k in pulses for k in range(0,9)]):
+                r = amps[8] - amps[0]
                 recovery = np.median(r) / amp_90p
                 collect_recovery_single.append(recovery)
                 if delay == 250e-3:
                     col_metrics['stp_recovery_single_250ms'].append(recovery)
-                    col_metrics['pulse_amp_stp_recovery_single_250ms'].append(amps[9])
+                    col_metrics['pulse_amp_stp_recovery_single_250ms'].append(amps[8])
 
             # collect individual pulse amplitudes
-            for i in range(1, 13):
+            for i in range(0, 12):
                 if i not in pulses:
                     break
                 collect_pulse_amps[i-1].append(amps[i])
@@ -258,8 +258,8 @@ def generate_pair_dynamics(pair, db, session, pr_recs=None):
 
     # Variability in STP-induced state (5th-8th pulses)
     pulse_amps = {
-        (2,3): [],
-        (5,9): [],
+        (1,2): [],
+        (4,8): [],
     }
     # collect pulse amplitudes in each category
     for key,recs in sorted_prs.items():
@@ -277,35 +277,35 @@ def generate_pair_dynamics(pair, db, session, pr_recs=None):
     pulse_var = {n:(variability(a) if len(a) > 0 else np.nan) for n,a in pulse_amps.items()}
         
     # record changes in vairabilty
-    dynamics.variability_second_pulse_50hz = pulse_var[2,3]
-    dynamics.variability_stp_induced_state_50hz = pulse_var[5,9]
-    dynamics.variability_change_initial_50hz = pulse_var[2,3] - dynamics.variability_resting_state
-    dynamics.variability_change_induction_50hz = pulse_var[5,9] - dynamics.variability_resting_state
+    dynamics.variability_second_pulse_50hz = pulse_var[1,2]
+    dynamics.variability_stp_induced_state_50hz = pulse_var[4,8]
+    dynamics.variability_change_initial_50hz = pulse_var[1,2] - dynamics.variability_resting_state
+    dynamics.variability_change_induction_50hz = pulse_var[4,8] - dynamics.variability_resting_state
     
     # Look for evidence of vesicle depletion -- correlations between adjacent events in 50Hz pulses 5-8.
     amps_1_2 = ([], [])
     amps_2_4 = ([], [])
     amps_4_8 = ([], [])
-    pulse_amps = [[] for i in range(9)]
+    pulse_amps = [[] for i in range(8)]
     for key,recs in sorted_prs.items():
         clamp_mode, ind_freq, rec_delay = key
         if ind_freq != 50:
             continue
         for recording, pulses in recs.items():
-            for i in range(1,9):
+            for i in range(0,8):
                 if i not in pulses:
                     break
-                if i == 2:
+                if i == 1:
                     amps_1_2[0].append(getattr(pulses[i-1].PulseResponseFit, amp_field))
                     amps_1_2[1].append(getattr(pulses[i].PulseResponseFit, amp_field))
-                if i == 4:
-                    first = np.median([getattr(pulses[i].PulseResponseFit, amp_field) for i in range(1, 3)])
-                    second = np.median([getattr(pulses[i].PulseResponseFit, amp_field) for i in range(3, 5)])
+                if i == 3:
+                    first = np.median([getattr(pulses[i].PulseResponseFit, amp_field) for i in range(0, 2)])
+                    second = np.median([getattr(pulses[i].PulseResponseFit, amp_field) for i in range(2, 4)])
                     amps_2_4[0].append(np.median(first))
                     amps_2_4[1].append(np.median(second))
-                if i == 8:
-                    first = np.median([getattr(pulses[i].PulseResponseFit, amp_field) for i in range(1, 5)])
-                    second = np.median([getattr(pulses[i].PulseResponseFit, amp_field) for i in range(5, 9)])
+                if i == 7:
+                    first = np.median([getattr(pulses[i].PulseResponseFit, amp_field) for i in range(0, 4)])
+                    second = np.median([getattr(pulses[i].PulseResponseFit, amp_field) for i in range(4, 8)])
                     amps_4_8[0].append(np.median(first))
                     amps_4_8[1].append(np.median(second))
     
