@@ -1,5 +1,12 @@
+import os, time, pickle, logging, functools, multiprocessing
+from collections import OrderedDict
+import numpy as np
+import sqlalchemy.orm
+from .file_management import model_result_cache_path
+from .model import StochasticReleaseModel
 
 
+logger = logging.getLogger(__name__)
 
 
 class StochasticModelRunner:
@@ -365,7 +372,6 @@ class ParameterSpace(object):
                     try:
                         dlg.update(i)
                     except dlg.CanceledError:
-                        pool.terminate()
                         raise Exception("Synapticulation cancelled. No refunds.")
         
     def params_at_index(self, inds):

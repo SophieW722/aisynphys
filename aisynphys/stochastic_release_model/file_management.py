@@ -25,6 +25,7 @@ def list_cached_results(cache_path=None):
 def load_cache_file(cache_file, db):
     """Load cached result and return a StochasticModelRunner instance for a single synapse model run.
     """
+    from .model_runner import StochasticModelRunner
     fn = os.path.splitext(os.path.split(cache_file)[1])[0]
     expt_id, pre_cell_id, post_cell_id = fn.split('_')
     mr = StochasticModelRunner(db, expt_id, pre_cell_id, post_cell_id)
