@@ -4,7 +4,7 @@ import aisynphys.config
 
 
 def model_result_cache_path():
-    return os.path.join(aisynphys.config.cache_path, 'stochastic_model_results')
+    return aisynphys.config.stochastic_model_cache_path
 
 
 def list_cached_results(cache_path=None):

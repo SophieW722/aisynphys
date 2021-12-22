@@ -1,91 +1,45 @@
-"""
-Script used for collecting stochastic release model results and running dimensionality reduction on them.
-
-Depending on the number of synapses to process and the size of the model parameter space, this
-may consume a large amount of memory and CPU time.
-
-"""
-
-import os, sys, pickle, gc, time, traceback, threading
+import os, pickle, gc, time, traceback
 import numpy as np
 import umap
 import sklearn.preprocessing, sklearn.decomposition
-from aisynphys.stochastic_release_model import StochasticModelRunner, load_cached_model_results
+from .file_management import list_cached_results, load_cached_model_results
 from aisynphys.database import default_db as db
 from aisynphys import config
-from aisynphys.ui.progressbar import ProgressBar
 
 
-class ThreadTrace(object):
-    """ 
-    Used to debug freezing by starting a new thread that reports on the 
-    location of other threads periodically.
+def reduce_model_results(output_file=None, likelihood_only=False, cache_path=None):
+    """Load all cached result files from the stochastic release model, concatenate into 
+    a single array, and reduce using sparse PCA.
+
+    This function requires a large amount of memory (1TB for original coarse matrix data) and CPU time.
+
+    Parameters
+    ----------
+    output_file : str | None
+        File to store SPCA results in. If None, then the filename is derived from aisynphys.config.release_model_spca_file
+    likelihood_only : bool
+        If True, then calculate SPCA based only on the likelihood values output from the model.
+        If False, then use likelihood values as well as any fit parameters (probably mini_amplitude)
+    cache_path : str | None
+        Path where cached model files can be found. If None, then the default path is used (see
+        aisynphys.stochastic_release_model.model_result_cache_path)
     """
-    def __init__(self, interval=10.0):
-        self.interval = interval
-        self._stop = False
-        self.start()
+    run_type = 'likelihood_only' if likelihood_only else 'all_results'
+    if output_file is None:
+        output_file = config.release_model_spca_file.format(run_type=run_type)
+    cache_files = [result[1] for result in list_cached_results(cache_path)]
 
-    def start(self, interval=None):
-        if interval is not None:
-            self.interval = interval
-        self._stop = False
-        self.thread = threading.Thread(target=self.run)
-        self.thread.daemon = True
-        self.thread.start()
-
-    def run(self):
-        while True:
-            if self._stop is True:
-                return
-                    
-            print("\n=============  THREAD FRAMES:  ================")
-            for id, frame in sys._current_frames().items():
-                if id == threading.current_thread().ident:
-                    continue
-
-                # try to determine a thread name
-                try:
-                    name = threading._active.get(id, None)
-                except:
-                    name = None
-                if name is None:
-                    try:
-                        # QThread._names must be manually set by thread creators.
-                        name = QtCore.QThread._names.get(id)
-                    except:
-                        name = None
-                if name is None:
-                    name = "???"
-
-                print("<< thread %d \"%s\" >>" % (id, name))
-                traceback.print_stack(frame)
-            print("===============================================\n")
-            
-            time.sleep(self.interval)
-
-# tt = ThreadTrace(60)
-print("start thread trace..")
-
-cache_path = config.cache_path
-model_result_cache_path = os.path.join(cache_path, 'stochastic_model_results')
-
-cache_files = [os.path.join(model_result_cache_path, f) for f in os.listdir(model_result_cache_path)]
-
-for run_type in ['all_results', 'likelihood_only']:
     ## Load all model outputs into a single array
     agg_result, cache_files, param_space = load_cached_model_results(cache_files, db=db)
     agg_shape = agg_result.shape
     print("  cache loaded.")
 
-    if run_type == 'all_results':
-        # first time, use complete result array
-        flat_result = agg_result.reshape(agg_shape[0], np.product(agg_shape[1:]))
-    elif run_type == 'likelihood_only':
-        # next use only mode likelihood; no amplitude
+    if likelihood_only:
+        # use only mode likelihood; no amplitude
         flat_result = agg_result[...,0].reshape(agg_shape[0], np.product(agg_shape[1:-1]))
     else:
-        raise ValueError(run_type)
+        # use complete result array
+        flat_result = agg_result.reshape(agg_shape[0], np.product(agg_shape[1:]))
     print("  reshape.")
 
     # Prescale model data
