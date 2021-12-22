@@ -32,6 +32,8 @@ rig_data_paths = {}
 known_addrs = {}
 pipeline = {}
 
+release_model_cache_path = os.path.join(cache_path, 'stochastic_model_results')
+release_model_spca_file = os.path.join(cache_path, 'sparse_pca_{run_type}.pkl')
 
 configfile = os.path.join(os.path.dirname(__file__), '..', 'config.yml')
 
