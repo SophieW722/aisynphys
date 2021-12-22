@@ -7,6 +7,13 @@ from aisynphys.database import default_db as db
 from aisynphys import config
 
 
+def default_spca_file(likelihood_only=False):
+    """Return default file name for sparse PCA results.
+    """
+    run_type = 'likelihood_only' if likelihood_only else 'all_results'
+    return config.release_model_spca_file.format(run_type=run_type)
+
+
 def reduce_model_results(output_file=None, likelihood_only=False, cache_path=None):
     """Load all cached result files from the stochastic release model, concatenate into 
     a single array, and reduce using sparse PCA.
@@ -24,9 +31,8 @@ def reduce_model_results(output_file=None, likelihood_only=False, cache_path=Non
         Path where cached model files can be found. If None, then the default path is used (see
         aisynphys.stochastic_release_model.model_result_cache_path)
     """
-    run_type = 'likelihood_only' if likelihood_only else 'all_results'
     if output_file is None:
-        output_file = config.release_model_spca_file.format(run_type=run_type)
+        output_file = default_spca_file(likelihood_only)
     cache_files = [result[1] for result in list_cached_results(cache_path)]
 
     ## Load all model outputs into a single array
@@ -61,6 +67,27 @@ def reduce_model_results(output_file=None, likelihood_only=False, cache_path=Non
     gc.collect()
 
     print("free memory")
+
+    # fit sparse PCA  (uses ~6x memory of input data)
+    try:
+        start = time.time()
+        print("Fitting sparse PCA...")
+        n_pca_components = 50
+        pca = sklearn.decomposition.MiniBatchSparsePCA(n_components=n_pca_components, n_jobs=-1)
+        pca.fit(scaled)
+        print("  Sparse PCA fit complete.")
+   
+        # run sparse PCA
+        print("Sparse PCA transform...")
+        sparse_pca_result = pca.transform(scaled)
+        pickle.dump({'result': sparse_pca_result, 'params': param_space, 'cache_files': cache_files, 'sparse_pca': pca}, open(output_file, 'wb'))
+        print("   Sparse PCA transform complete: %s" % output_file)
+    except Exception as exc:
+        print("Sparse PCA failed:")
+        traceback.print_exc()
+    finally:
+        print("Sparse PCA time: %d sec" % int(time.time()-start))
+
 
 # fit standard PCA   (uses ~2x memory of input data)
 #try:
@@ -111,27 +138,4 @@ def reduce_model_results(output_file=None, likelihood_only=False, cache_path=Non
 #    traceback.print_exc()
 #finally:
 #    print("UMAP time: %d sec" % int(time.time()-start))
-
-
-
-    # fit sparse PCA  (uses ~6x memory of input data)
-    try:
-        start = time.time()
-        print("Fitting sparse PCA...")
-        n_pca_components = 50
-        pca = sklearn.decomposition.MiniBatchSparsePCA(n_components=n_pca_components, n_jobs=-1)
-        pca.fit(scaled)
-        print("  Sparse PCA fit complete.")
-   
-        # run sparse PCA
-        print("Sparse PCA transform...")
-        sparse_pca_result = pca.transform(scaled)
-        sparse_pca_file = os.path.join(cache_path, f'sparse_pca_{run_type}.pkl')
-        pickle.dump({'result': sparse_pca_result, 'params': param_space, 'cache_files': cache_files, 'sparse_pca': pca}, open(sparse_pca_file, 'wb'))
-        print("   Sparse PCA transform complete: %s" % sparse_pca_file)
-    except Exception as exc:
-        print("Sparse PCA failed:")
-        traceback.print_exc()
-    finally:
-        print("Sparse PCA time: %d sec" % int(time.time()-start))
 
