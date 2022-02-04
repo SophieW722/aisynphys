@@ -35,6 +35,7 @@ def dispose_all_engines():
 
 
 def init_default_db():
+    global default_db
     # initialize a default database connection if configured or requested via CLI
     try:
         default_db = create_default_db()
