@@ -25,18 +25,14 @@ class CortexLocationPipelineModule(DatabasePipelineModule):
         lims_layers = get_lims_layers() 
         db = job['database']
         expt_id = job['job_id']
-        errors = []
 
         expt = db.experiment_from_ext_id(expt_id, session=session)
         image_series_id, soma_centers, image_series_resolution = get_lims_info(expt)
         
-        results, cell_errors = get_depths_slice(image_series_id, soma_centers,
+        results, errors, cell_errors = get_depths_slice(image_series_id, soma_centers,
                                                 species=expt.slice.species,
-                                                resolution=image_series_resolution)
-        if len(results)==0:
-            errors.append("No cells passed depth calculation.")
-            errors.extend(cell_errors)
-            return errors
+                                                resolution=image_series_resolution,
+                                                ignore_pia_wm=True)
 
         missed_cells = []
         for cell in expt.cell_list:
@@ -72,7 +68,8 @@ class CortexLocationPipelineModule(DatabasePipelineModule):
             msg = f"Cells {missed_cells} (of {len(soma_centers)}) cells failed depth calculation."
             logger.error(msg)
             errors.append(msg)
-            errors.extend(cell_errors)
+            errors.extend([f"Failure getting depth info for cell {name}: {exc}" 
+                           for name, exc in cell_errors.items()])
             
         for pair in expt.pair_list:
             pre_id = pair.pre_cell.meta.get('lims_specimen_id')

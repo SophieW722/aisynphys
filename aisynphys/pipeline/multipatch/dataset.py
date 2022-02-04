@@ -1,4 +1,4 @@
-import os, struct, hashlib
+import os, struct, hashlib, scipy
 import numpy as np
 from collections import OrderedDict
 from ... import config, qc
@@ -28,7 +28,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
     def create_db_entries(cls, job, session):
         db = job['database']
         job_id = job['job_id']
-
+       
         # Load experiment from DB
         expt_entry = db.experiment_from_ext_id(job_id, session=session)
         elecs_by_ad_channel = {elec.device_id:elec for elec in expt_entry.electrodes}
@@ -46,7 +46,8 @@ class DatasetPipelineModule(MultipatchPipelineModule):
         nwb = expt.data
         
         last_stim_pulse_time = {}
-        
+        tp_entries = {}
+
         # Load all data from NWB into DB
         for srec in nwb.contents:
             temp = srec.meta.get('temperature', None)
@@ -71,6 +72,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                     stim_name=(None if rec.stimulus is None else rec.stimulus.description),
                     stim_meta=(None if rec.stimulus is None else rec.stimulus.save()),
                 )
+                
                 session.add(rec_entry)
                 rec_entries[rec.device_id] = rec_entry
                 
@@ -108,7 +110,10 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                     )
                     session.add(tp_entry)
                     pcrec_entry.nearest_test_pulse = tp_entry
-                    
+                    if electrode_entry.id not in tp_entries.keys():
+                        tp_entries[electrode_entry.id] = []
+                    tp_entries[electrode_entry.id].append(tp_entry)
+
                 # import information about STP protocol
                 if not isinstance(rec, (MultiPatchProbe, MultiPatchMixedFreqTrain)):
                     continue
@@ -173,6 +178,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                         if i == 0:
                             # pulse.first_spike = spike_entry
                             pulse.first_spike_time = spike_entry.max_slope_time
+            
             
             if not srec_has_mp_probes:
                 continue
@@ -276,10 +282,29 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                             baseline_entry_cache[key] = base_entry
                         
                         resp_entry.baseline = baseline_entry_cache[key]
-
+            
             if unmatched > 0:
                 print("%s %s: %d pulse responses without matched baselines" % (job_id, srec, unmatched))
         
+        # lowpass filter access resistance and then go back through each electrode to fill in for test_pulse
+        for electrode, tps in tp_entries.items():
+            tp_access_r = np.asarray([tp.access_resistance for tp in tps if tp.access_resistance is not None])
+            good_tps= [tp for tp in tps if tp.access_resistance is not None]
+            if len(tp_access_r) < 2: 
+                continue
+            lowpass_ras = scipy.ndimage.median_filter(tp_access_r, 5, mode='nearest')
+            for tp_entry, lowpass_ra in zip(good_tps, lowpass_ras):
+                tp_entry.access_resistance_lowpass = lowpass_ra
+                
+                # calculate adjusted Vm in VC in patch_clamp_recording
+                pcr = tp_entry.recording.patch_clamp_recording
+                if pcr.baseline_potential is None or tp_entry.baseline_current is None:
+                    continue
+                if pcr.clamp_mode=='vc':
+                    adjusted_baseline = pcr.baseline_potential - lowpass_ra * tp_entry.baseline_current
+                    pcr.access_adj_baseline_potential = adjusted_baseline
+        
+
     def job_records(self, job_ids, session):
         """Return a list of records associated with a list of job IDs.
         

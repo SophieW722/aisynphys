@@ -168,7 +168,7 @@ def sort_responses(pulse_responses):
     at this stage that the PR has exactly one presynaptic spike with a detectable onset time.
     """
     ex_limits = [-80e-3, -60e-3]
-    in_limits = [-60e-3, -45e-3]
+    in_limits = [-60e-3, -50e-3]
     
     sorted_responses = {
         ('ic', -70): {'qc_pass': [], 'qc_fail': []},

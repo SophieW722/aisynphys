@@ -3,10 +3,12 @@ from aisynphys.database import default_db as db
 
 date = datetime.datetime.today().strftime("%Y-%m-%d")
 
+fmt_dict = {'date': date, 'schema': db.version_name}
+
 db_files = {
-    'small': "db_bakes/synphys_%s_small.sqlite" % date,
-    'medium': "db_bakes/synphys_current_medium.sqlite",
-    'full': "db_bakes/synphys_current_full.sqlite",
+    'small': "db_bakes/synphys_{schema}_{date}_small.sqlite".format(**fmt_dict),
+    'medium': "db_bakes/synphys_{schema}_current_medium.sqlite".format(**fmt_dict),
+    'full': "db_bakes/synphys_{schema}_current_full.sqlite".format(**fmt_dict),
 }
 
 skip_tables = {}

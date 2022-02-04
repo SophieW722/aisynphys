@@ -55,6 +55,13 @@ class NDArray(TypeDecorator):
     def python_type(self):
         return np.ndarray
 
+class CustomEncoder(json.JSONEncoder):
+    """ For encoding nonserializable floats into json
+    """
+    def default(self, obj):
+        if isinstance(obj, np.floating):
+            return float(obj)
+        return json.JSONEncoder.default(self, obj)
 
 class JSONObject(TypeDecorator):
     """For marshalling objects in/out of json-encoded text.
@@ -63,7 +70,7 @@ class JSONObject(TypeDecorator):
     hashable = False
     
     def process_bind_param(self, value, dialect):
-        return json.dumps(value)
+        return json.dumps(value, cls=CustomEncoder)
         
     def process_result_value(self, value, dialect):
         if value is None:
@@ -230,6 +237,7 @@ class Database(object):
             'postgresql': {
                 'ro': {'echo': False, 'poolclass': sqlalchemy.pool.NullPool, 'isolation_level': 'AUTOCOMMIT'}, # {'pool_size': 0, 'max_overflow': 40, }
                 'rw': {'poolclass': sqlalchemy.pool.NullPool}, #{'pool_size': 0, 'max_overflow': 40},
+                'maint': {'poolclass': sqlalchemy.pool.NullPool},
             }
         }
 
@@ -388,11 +396,10 @@ class Database(object):
         """
         self._check_engines()
         if self._maint_engine is None:
-            if self.backend == 'postgresql':
-                opts = {'poolclass': sqlalchemy.pool.NullPool, 'pool_size': 0, 'max_overflow': 40}
-            else:
+            opts = self._engine_opts.get(self.backend, {}).get('maint', None)
+            if opts is None:
                 # maybe just return rw engine for postgres?
-                raise Exception("no maintenance connection for DB %s" % self)
+                raise Exception("no maintenance connection configured for DB %s" % self)
             maint_addr = self.db_address(self.rw_host, 'postgres')
             self._maint_engine = create_engine(maint_addr, **opts)
             self._engine_pid = os.getpid()
