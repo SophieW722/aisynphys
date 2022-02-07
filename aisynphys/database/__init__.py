@@ -34,8 +34,13 @@ def dispose_all_engines():
     Database.dispose_all_engines()
 
 
-# initialize a default database connection if configured or requested via CLI
-try:
-    default_db = create_default_db()
-except Exception as exc:
-    default_db = NoDatabase(exc)
+def init_default_db():
+    global default_db
+    # initialize a default database connection if configured or requested via CLI
+    try:
+        default_db = create_default_db()
+    except Exception as exc:
+        default_db = NoDatabase(exc)
+
+
+init_default_db()
