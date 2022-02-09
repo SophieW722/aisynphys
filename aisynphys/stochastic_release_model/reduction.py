@@ -10,7 +10,7 @@ def default_spca_file(likelihood_only=False):
     """Return default file name for sparse PCA results.
     """
     run_type = 'likelihood_only' if likelihood_only else 'all_results'
-    return config.release_model_spca_file.format(run_type=run_type)
+    return config.stochastic_model_spca_file.format(run_type=run_type)
 
 
 def reduce_model_results(output_file=None, likelihood_only=False, cache_path=None):
