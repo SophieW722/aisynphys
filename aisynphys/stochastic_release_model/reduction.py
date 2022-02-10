@@ -80,7 +80,13 @@ def reduce_model_results(output_file=None, likelihood_only=False, cache_path=Non
         # run sparse PCA
         print("Sparse PCA transform...")
         sparse_pca_result = pca.transform(scaled)
-        pickle.dump({'result': sparse_pca_result, 'params': param_space, 'cache_files': cache_files, 'sparse_pca': pca}, open(output_file, 'wb'))
+        pickle.dump({
+            'result': sparse_pca_result, 
+            'params': param_space, 
+            'cache_files': cache_files, 
+            'sparse_pca': pca, 
+            'scaler': scaler,
+        }, open(output_file, 'wb'))
         print("   Sparse PCA transform complete: %s" % output_file)
     except Exception as exc:
         print("Sparse PCA failed:")
