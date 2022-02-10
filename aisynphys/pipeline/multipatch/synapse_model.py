@@ -12,6 +12,8 @@ from functools import lru_cache
 
 import numpy as np
 
+from aisynphys.stochastic_release_model.reduction import load_spca_results
+
 from ... import config
 from ...dynamics import generate_pair_dynamics
 from .pipeline_module import MultipatchPipelineModule
@@ -176,9 +178,20 @@ def make_model_result_entry(pair_id, db, session, model_cache_file):
             setattr(entry, 'ml_'+name, getattr(dynamics, name))
 
     # load SPCA vector if available
+    spca_results = load_spca_results()
+    raise Exception()
 
+    entry.sparse_pca_vector = spca_results.get((expt_id, pre_id, post_id), None)
+
+    # # verify spca model in DB matches this one
+    # if entry.sparse_pca_vector is not None:
+        # meta_entry = db.metadata_record()
+        # spca_model_in_db = meta_entry.meta.get('stochastic_release_sparse_pca_model', None)
 
     return entry
+
+
+
 
 
 def get_release_dependence_ratio(param_space):

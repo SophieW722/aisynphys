@@ -18,7 +18,7 @@ SynapseModel = make_table(
         ('marginal_distributions', 'object', 'Contains marginal distributions for all model parameters', {'deferred': True}),
         ('confidence_intervals', 'object', 'Contains confidence intervals for all model parameters', {'deferred': True}),
 
-        ('sparse_pca_vector', 'float', 'Sparse PCA vector describing model output (SPCA model details kept in db.meta.. '), fixme!
+        # ('sparse_pca_vector', 'float', 'Sparse PCA vector describing model output (SPCA model details kept in db.meta.. '),
 
         ('max_likelihood', 'float', 'The maximum model likelihood value'),
         ('ml_n_release_sites', 'float', 'Maximum likelihood value for n_release_sites'),
