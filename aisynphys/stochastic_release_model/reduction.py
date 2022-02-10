@@ -73,7 +73,7 @@ def reduce_model_results(output_file=None, likelihood_only=False, cache_path=Non
         start = time.time()
         print("Fitting sparse PCA...")
         n_pca_components = 50
-        pca = sklearn.decomposition.MiniBatchSparsePCA(n_components=n_pca_components, n_jobs=-1)
+        pca = sklearn.decomposition.MiniBatchSparsePCA(n_components=n_pca_components, n_jobs=-1, random_state=0)
         pca.fit(scaled)
         print("  Sparse PCA fit complete.")
    
