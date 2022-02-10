@@ -1,14 +1,14 @@
 from acq4.Manager import getManager
-from acq4.pyqtgraph.Qt import QtGui, QtCore
-import acq4.pyqtgraph as pg
+import acq4.util.Qt as Qt
+import pyqtgraph as pg
 import numpy as np
 import scipy.ndimage as ndimage
 import scipy.stats as stats
 
 
-class VImagingAnalyzer(QtGui.QSplitter):
+class VImagingAnalyzer(Qt.QSplitter):
     def __init__(self):
-        QtGui.QSplitter.__init__(self, QtCore.Qt.Horizontal)
+        Qt.QSplitter.__init__(self, Qt.Qt.Horizontal)
         self.resize(800, 1000)
             
         self.params = pg.parametertree.Parameter(name='params', type='group', children=[
@@ -20,9 +20,9 @@ class VImagingAnalyzer(QtGui.QSplitter):
         self.ptree.setParameters(self.params)
         self.params.child('sequence').sigTreeStateChanged.connect(self.update_sequence_analysis)        
         
-        self.leftPanel = QtGui.QWidget()
+        self.leftPanel = Qt.QWidget()
         self.addWidget(self.leftPanel)
-        self.layout = QtGui.QGridLayout()
+        self.layout = Qt.QGridLayout()
         self.layout.setContentsMargins(0, 0, 0, 0)
         self.leftPanel.setLayout(self.layout)
         
@@ -342,11 +342,11 @@ class VImagingAnalyzer(QtGui.QSplitter):
         self.clamp_mode = None
 
 
-class VImagingAnalyzer2(QtGui.QWidget):
+class VImagingAnalyzer2(Qt.QWidget):
     def __init__(self):
-        QtGui.QWidget.__init__(self)
+        Qt.QWidget.__init__(self)
 
-        self.layout = QtGui.QVBoxLayout()
+        self.layout = Qt.QVBoxLayout()
         self.setLayout(self.layout)
         self.imv1 = pg.ImageView()
         self.layout.addWidget(self.imv1)

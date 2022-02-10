@@ -836,13 +836,13 @@ class StochasticModelRunner:
         self._parameters = None
         self._param_space = None
 
-        self._cache_path = cache_path or os.path.join(aisynphys.config.cache_path, 'stochastic_model_results')
-        self._cache_file = os.path.join(self._cache_path, "%s_%s_%s.pkl" % (experiment_id, pre_cell_id, post_cell_id))
+        self._cache_path = cache_path or model_result_cache_path()
+        self.cache_file = os.path.join(self._cache_path, "%s_%s_%s.pkl" % (experiment_id, pre_cell_id, post_cell_id))
         # whether to save cache file after running
         self._save_cache = save_cache
 
-        if load_cache and os.path.exists(self._cache_file):
-            self.load_result(self._cache_file)
+        if load_cache and os.path.exists(self.cache_file):
+            self.load_result(self.cache_file)
 
     def run_model(self, params, **kwds):
         """Run the model for *params* and return a StochasticModelResult instance.
@@ -861,7 +861,7 @@ class StochasticModelRunner:
         if self._param_space is None:
             self._param_space = self.generate_param_space()
             if self._save_cache:
-                self.store_result(self._cache_file)
+                self.store_result(self.cache_file)
         return self._param_space
 
     def best_params(self):
@@ -942,7 +942,7 @@ class StochasticModelRunner:
             raise Exception("No events found for this synapse.")
 
         rec_times = (events['rec_start_time'] - events['rec_start_time'].iloc[0]).dt.total_seconds().to_numpy()
-        spike_times = events['first_spike_time'].to_numpy() + rec_times
+        spike_times = events['first_spike_time'].to_numpy().astype(float) + rec_times
         
         # some metadata to follow the events around--not needed for the model, but useful for 
         # analysis later on.
@@ -957,6 +957,8 @@ class StochasticModelRunner:
 
         # get individual event amplitudes
         amplitudes = events['dec_fit_reconv_amp'].to_numpy().astype(float)
+        if np.isfinite(amplitudes).sum() == 0:
+            raise Exception("No event amplitudes available for this synapse.")
         
         # filter events by inhibitory or excitatory qc
         qc_field = syn_type + '_qc_pass'
@@ -1036,7 +1038,7 @@ class StochasticModelRunner:
         spike_times, amplitudes, bg_amplitudes, event_meta = self.synapse_events
         
         measurement_stdev = np.nanstd(bg_amplitudes)
-        assert np.isfinite(measurement_stdev), "Could not measure background amplitude stdev"
+        assert np.isfinite(measurement_stdev), "Could not measure background amplitude stdev (no finite values available)"
 
         def logspace(start, finish, n):
             return start * ((finish / start)**(1 / (n-1)))**np.arange(n)
@@ -1109,11 +1111,15 @@ class CombinedModelRunner:
         return runner.run_model(params)
 
 
+def model_result_cache_path():
+    return os.path.join(aisynphys.config.cache_path, 'stochastic_model_results')
+
+
 def list_cached_results(cache_path=None):
     """Return a list of (pair_id, cache_file) for all cached model results.
     """
     if cache_path is None:
-        cache_path = os.path.join(aisynphys.config.cache_path, 'stochastic_model_results')
+        cache_path = model_result_cache_path()
     files = os.listdir(cache_path)
     results = []
     for cf in files:

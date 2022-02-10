@@ -143,13 +143,22 @@ class SynphysDatabase(Database):
             assert ver == schema_version, "Database {self} has unsupported schema version {ver} (expected {schema_version})".format(locals())
     
     def metadata_record(self, session=None):
-        session = session or self.default_session
-        recs = session.query(self.Metadata).all()
-        if len(recs) == 0:
-            return None
-        elif len(recs) > 1:
-            raise Exception("Multiple metadata records found.")
-        return recs[0]
+        if session is None:
+            session = self.session()
+            close_session = True
+        else:
+            close_session = False
+
+        try:
+            recs = session.query(self.Metadata).all()
+            if len(recs) == 0:
+                return None
+            elif len(recs) > 1:
+                raise Exception("Multiple metadata records found.")
+            return recs[0]
+        finally:
+            if close_session:
+                session.close()
         
     def slice_from_timestamp(self, ts, session=None):
         session = session or self.default_session
