@@ -32,7 +32,7 @@ def reduce_model_results(output_file=None, likelihood_only=False, cache_path=Non
     """
     if output_file is None:
         output_file = default_spca_file(likelihood_only)
-    cache_files = [result[1] for result in list_cached_results(cache_path)][:10]
+    cache_files = [result[1] for result in list_cached_results(cache_path)]
     print(f"Generating SPCA reduction from {len(cache_files)} cached model files; writing to {output_file}")
 
     ## Load all model outputs into a single array
