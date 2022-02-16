@@ -179,10 +179,9 @@ def make_model_result_entry(pair_id, db, session, model_cache_file):
 
     # load SPCA vector if available
     spca_results = load_spca_results()
-    raise Exception()
 
-    entry.sparse_pca_vector = spca_results.get((expt_id, pre_id, post_id), None)
-
+    entry.sparse_pca_vector = spca_results['sparse_pca_vectors'].get((expt_id, pre_id, post_id), None)
+    
     # # verify spca model in DB matches this one
     # if entry.sparse_pca_vector is not None:
         # meta_entry = db.metadata_record()

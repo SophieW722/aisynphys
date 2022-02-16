@@ -34,6 +34,9 @@ pipeline = {}
 
 configfile = os.path.join(os.path.dirname(__file__), '..', 'config.yml')
 
+stochastic_model_cache_path = None
+stochastic_model_spca_file = None
+
 # load values from ../config.yml (path relative to this python file)
 if os.path.isfile(configfile):
     if hasattr(yaml, 'FullLoader'):
@@ -49,8 +52,11 @@ if os.path.isfile(configfile):
     for k,v in config.items():
         locals()[k] = v
 
-stochastic_model_cache_path = os.path.join(cache_path, 'stochastic_model_results')
-stochastic_model_spca_file = os.path.join(cache_path, 'sparse_pca_{run_type}.pkl')
+
+if stochastic_model_cache_path is None:
+    stochastic_model_cache_path = os.path.join(cache_path, 'stochastic_model_results')
+if stochastic_model_spca_file is None:
+    stochastic_model_spca_file = os.path.join(cache_path, 'sparse_pca_{run_type}.pkl')
 
 
 # intercept specific command line args

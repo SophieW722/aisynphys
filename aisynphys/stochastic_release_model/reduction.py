@@ -81,11 +81,11 @@ def reduce_model_results(output_file=None, likelihood_only=False, cache_path=Non
         print("Sparse PCA transform...")
         sparse_pca_result = pca.transform(scaled)
         pickle.dump({
-            'result': sparse_pca_result, 
-            'params': param_space, 
+            'sparse_pca_vectors': sparse_pca_result, 
+            'param_space': param_space, 
             'cache_files': cache_files, 
-            'sparse_pca': pca, 
-            'scaler': scaler,
+            'sparse_pca_model': pca, 
+            'pre_scaler': scaler,
         }, open(output_file, 'wb'))
         print("   Sparse PCA transform complete: %s" % output_file)
     except Exception as exc:
@@ -165,17 +165,15 @@ def load_spca_results(max_vector_size=None, likelihood_only=False):
 
     sm_results = pickle.load(open(spca_file, 'rb'))
 
-    results = {
-        'model': sm_results['sparse_pca'],
-        'param_space': sm_results['params'],
-        'synapse_vectors': {},
-    }
+    results = sm_results.copy()
+    results['sparse_pca_vectors'] = {}
+
     for i, cache_file in enumerate(sm_results['cache_files']):
         expt_id, pre_cell_id, post_cell_id = os.path.split(os.path.splitext(cache_file)[0])[1].split('_')
         syn_id = (expt_id, pre_cell_id, post_cell_id)
-        vector = sm_results['result'][i]
+        vector = sm_results['sparse_pca_vectors'][i]
         if max_vector_size is not None:
             vector = vector[:max_vector_size]
-        results['synapse_vectors'][syn_id] = vector
+        results['sparse_pca_vectors'][syn_id] = vector
 
     return results
