@@ -126,8 +126,7 @@ class PatchSeqPipelineModule(MultipatchPipelineModule):
                         mapped_subclass = get_mapped_subclass(cell, results)
                         results['mapped_subclass'] = mapped_subclass
                         
-                        # Update cell_class_nonsynaptic
-                        #  (cell_class gets updated later)
+                        # Update cell_class and cell_class_nonsynaptic
                         t_class = results.get('broad_class_label') if tree_call != 'PoorQ' else None
                         t_class_key = {'GABAergic': 'in', 'GABAergic neuron': 'in', 'Glutamatergic': 'ex', 'Glutamatergic neuron': 'ex'}
                         cell_meta = cell.meta.copy()
