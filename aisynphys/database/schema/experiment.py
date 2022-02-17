@@ -140,7 +140,7 @@ class CellBase(object):
         """
         tm_classes = set()
         tms_classes = set()
-        for name in ['transgenic', 'morpho', 'synaptic']:
+        for name in ['transgenic', 'morpho', 'synaptic', 'transcriptomic']:
             cell_cls = self.meta.get(name + '_cell_class', None)
             if cell_cls is None:
                 continue
