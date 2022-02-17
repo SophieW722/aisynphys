@@ -125,6 +125,17 @@ class PatchSeqPipelineModule(MultipatchPipelineModule):
 
                         mapped_subclass = get_mapped_subclass(cell, results)
                         results['mapped_subclass'] = mapped_subclass
+                        
+                        # Update cell_class_nonsynaptic
+                        #  (cell_class gets updated later)
+                        t_class = results.get('broad_class_label') if tree_call != 'PoorQ' else None
+                        t_class_key = {'GABAergic': 'in', 'GABAergic neuron': 'in', 'Glutamatergic': 'ex', 'Glutamatergic neuron': 'ex'}
+                        cell_meta = cell.meta.copy()
+                        cell_meta['transcriptomic_cell_class'] = t_class_key.get(t_class, None)
+                        cell.meta = cell_meta
+
+                        # this gets updated again in later modules
+                        cell.cell_class, cell.cell_class_nonsynaptic = cell._infer_cell_classes()
 
                     # Write new record to DB
                     patch_seq = db.PatchSeq(cell_id=cell.id, **results)
