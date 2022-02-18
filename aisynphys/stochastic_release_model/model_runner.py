@@ -132,7 +132,9 @@ class StochasticModelRunner:
             raise Exception("No events found for this synapse.")
 
         rec_times = (events['rec_start_time'] - events['rec_start_time'].iloc[0]).dt.total_seconds().to_numpy()
-        spike_times = events['first_spike_time'].to_numpy().astype(float) + rec_times
+        first_spike_time = events['first_spike_time'].to_numpy().astype(float)
+        spike_times = first_spike_time + rec_times
+        onset_time = events['onset_time'].to_numpy().astype(float)
         
         # some metadata to follow the events around--not needed for the model, but useful for 
         # analysis later on.
@@ -141,8 +143,8 @@ class StochasticModelRunner:
         # any missing spike times get filled in with the average latency
         missing_spike_mask = np.isnan(spike_times)
         logger.info("%d events missing spike times", missing_spike_mask.sum())
-        avg_spike_latency = np.nanmedian(events['first_spike_time'] - events['onset_time'])
-        pulse_times = events['onset_time'] + avg_spike_latency + rec_times
+        avg_spike_latency = np.nanmedian(first_spike_time - onset_time)
+        pulse_times = onset_time + avg_spike_latency + rec_times
         spike_times[missing_spike_mask] = pulse_times[missing_spike_mask]
 
         # get individual event amplitudes
