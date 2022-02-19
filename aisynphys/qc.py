@@ -70,8 +70,8 @@ def pulse_response_qc_pass(post_rec, window, n_spikes, adjacent_pulses):
     * Postsynaptic recording passes recording_qc_pass()
     * Presynaptic cell must have at least 1 spike in response to pulse
     * No other presynaptic pulses within 8ms on either side
-    * Inhibitory response baseline potential must be between -45 and -60 mV
-    * Excitatory response baseline potential must be between -45 and -80 mV
+    * Inhibitory response baseline potential must be between -50 and -60 mV
+    * Excitatory response baseline potential must be between -50 and -80 mV
     * Overall stdev for postsynaptic recording must be < 1.5 mV or < 15 pA
     * Current clamp response must never exceed -40 mV
     
