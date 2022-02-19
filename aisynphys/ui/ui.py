@@ -182,9 +182,9 @@ class ExperimentTimeline(QtGui.QWidget):
                 i_hold[j] = rec.baseline_current
                 if rec.clamp_mode == 'vc':
                     v_noise[j] = np.nan
-                    i_noise[j] = rec.baseline_rms_noise
+                    i_noise[j] = rec.baseline_noise_stdev
                 else:
-                    v_noise[j] = rec.baseline_rms_noise
+                    v_noise[j] = rec.baseline_noise_stdev
                     i_noise[j] = np.nan
                     
             # scale all qc metrics to the range 0-1

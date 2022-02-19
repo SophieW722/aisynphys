@@ -86,7 +86,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                     patch_mode=rec.patch_mode,
                     baseline_potential=rec.baseline_potential,
                     baseline_current=rec.baseline_current,
-                    baseline_rms_noise=rec.baseline_rms_noise,
+                    baseline_noise_stdev=rec.baseline_noise_stdev,
                     qc_pass=qc_pass,
                     meta=None if len(qc_failures) == 0 else {'qc_failures': qc_failures},
                 )

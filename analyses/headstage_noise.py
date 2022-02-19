@@ -7,7 +7,7 @@ s = db.session()
 
 q = """
     select 
-        pcrec.baseline_rms_noise,
+        pcrec.baseline_noise_stdev,
         substring(experiment.original_path from 36 for 1),
         recording.device_key,
         recording.start_time
@@ -18,7 +18,7 @@ q = """
         join experiment on sync_rec.experiment_id=experiment.id
     where
         pcrec.clamp_mode='ic'
-        and pcrec.baseline_rms_noise is not null
+        and pcrec.baseline_noise_stdev is not null
         and recording.device_key is not null
         and experiment.original_path is not null
 """
@@ -55,7 +55,7 @@ for r, c in ((1, 'r'), (2, 'g'), (3, 'b')):
 
     p = grid[r-1, 0]
     p.plot(ts[mask], rig_data, pen=None, symbol='o', symbolPen=None, symbolBrush=(255, 255, 255, 100))
-    p.setLabels(left=('rig %d baseline rms noise'%r, 'V'))
+    p.setLabels(left=('rig %d baseline noise stdev'%r, 'V'))
 
 grid.setXLink(grid[0, 0])
 grid.setYLink(grid[0, 0])
