@@ -71,7 +71,7 @@ PatchClampRecording = make_table(
         ('patch_mode', 'str', "The state of the membrane patch. E.g. 'whole cell', 'cell attached', 'loose seal', 'bath', 'inside out', 'outside out'"),
         ('baseline_potential', 'float', 'Median steady-state potential (recorded for IC or commanded for VC) during the recording'),
         ('baseline_current', 'float', 'Median steady-state current (recorded for VC or commanded for IC) during the recording'),
-        ('baseline_rms_noise', 'float', 'RMS noise of the steady-state part of the recording'),
+        ('baseline_noise_stdev', 'float', 'Noise measured as standard deviation of steady-state parts of the recording'),
         ('nearest_test_pulse_id', 'test_pulse.id', 'ID of the test pulse that was recorded closest to this recording (and possibly embedded within the recording)'),
         ('qc_pass', 'bool', 'Indicates whether this recording passes a minimal ephys QC', {'index': True}),
         ('access_adj_baseline_potential', 'float', 'Baseline membrane potential estimated by adjusting VC command for access resistance'),

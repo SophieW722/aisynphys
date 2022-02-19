@@ -11,7 +11,7 @@ def recording_qc_pass(rec):
     """Applies a minimal set of QC criteria to a recording:
 
     * Must be a complete sweep (cannot contain large chunks of 0s)
-    * Baseline RMS noise must be < 5mV or < 200 pA
+    * Baseline noise stdev must be < 5mV or < 200 pA
     * Baseline current must be < 800 pA
     * For current clamp, baseline potential must be between -45 and -85 mV
 
@@ -44,16 +44,16 @@ def recording_qc_pass(rec):
         elif rec.baseline_potential < -85e-3 or rec.baseline_potential > -45e-3:
             failures.append('baseline potential of %s is outside of bounds [-85mV, -45mV]' % si_format(rec.baseline_potential, suffix='V'))
         
-        if rec.baseline_rms_noise is None:
-            failures.append('no baseline_rms_noise for this recording')
-        elif rec.baseline_rms_noise > 5e-3:
-            failures.append('baseline rms noise of %s exceeds 5mV' % si_format(rec.baseline_rms_noise, suffix='V'))
+        if rec.baseline_noise_stdev is None:
+            failures.append('no baseline_noise_stdev for this recording')
+        elif rec.baseline_noise_stdev > 5e-3:
+            failures.append('baseline noise stdev of %s exceeds 5mV' % si_format(rec.baseline_noise_stdev, suffix='V'))
         
     elif rec.clamp_mode == 'vc':
-        if rec.baseline_rms_noise is None:
-            failures.append('no baseline_rms_noise for this recording')
-        elif rec.baseline_rms_noise > 200e-12:
-           failures.append('baseline rms noise of %s exceeds 200pA' % si_format(rec.baseline_rms_noise, suffix='A'))
+        if rec.baseline_noise_stdev is None:
+            failures.append('no baseline_noise_stdev for this recording')
+        elif rec.baseline_noise_stdev > 200e-12:
+           failures.append('baseline noise stdev of %s exceeds 200pA' % si_format(rec.baseline_noise_stdev, suffix='A'))
        
         
     data = rec['primary'].data

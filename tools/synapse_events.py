@@ -35,7 +35,7 @@ class SynapseEventWindow(pg.QtGui.QSplitter):
             'recovery_delay': {'column': db.MultiPatchProbe.recovery_delay, 'mode': 'range', 'dtype': float},
             'baseline_current': {'column': db.PatchClampRecording.baseline_current, 'mode': 'range', 'dtype': float},
             'baseline_potential': {'column': db.PatchClampRecording.baseline_potential, 'mode': 'range', 'dtype': float},
-            'baseline_rms_noise': {'column': db.PatchClampRecording.baseline_rms_noise, 'mode': 'range', 'dtype': float},
+            'baseline_noise_stdev': {'column': db.PatchClampRecording.baseline_noise_stdev, 'mode': 'range', 'dtype': float},
             'recording_qc_pass': {'column': db.PatchClampRecording.qc_pass, 'mode': 'enum', 'values': [True, False], 'dtype': bool},
         }
         for table, prefix in [(db.PulseResponse, ''), (db.PulseResponseFit, ''), (db.PulseResponseStrength, '')]:

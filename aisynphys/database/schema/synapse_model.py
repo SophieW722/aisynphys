@@ -13,10 +13,13 @@ SynapseModel = make_table(
         ('pair_id', 'pair.id', 'The ID of the cell pair described by each record', {'index': True, 'unique': True}),
         ('n_source_events', 'int', 'Number of qc-passed pulse response amplitudes used to fit the model', {'index': True}),
 
-        ('parameter_space', 'object', 'Describes the parameter space searched thby the model', {'deferred': True}),
+
+        ('parameter_space', 'object', 'Describes the parameter space searched by the model', {'deferred': True}),
         ('marginal_distributions', 'object', 'Contains marginal distributions for all model parameters', {'deferred': True}),
         ('confidence_intervals', 'object', 'Contains confidence intervals for all model parameters', {'deferred': True}),
-        
+
+        ('sparse_pca_vector', 'array', 'Sparse PCA vector describing model output over entire parameter space'),
+
         ('max_likelihood', 'float', 'The maximum model likelihood value'),
         ('ml_n_release_sites', 'float', 'Maximum likelihood value for n_release_sites'),
         ('ml_base_release_probability', 'float', 'Maximum likelihood value for base_release_probability'),

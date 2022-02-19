@@ -925,13 +925,13 @@ class CorrectionMetricFunctions:
         return n_spikes            
 
     @staticmethod
-    def baseline_rms_noise(pair):
+    def baseline_noise_stdev(pair):
         post_cell = pair.post_cell
         q = db.query(db.PatchClampRecording)
         q = q.join(db.Recording).join(db.Electrode).join(db.Cell)
         q = q.filter(db.Cell.id==post_cell.id).filter(db.PatchClampRecording.clamp_mode=='ic')
         pcrs = q.all()
-        pcr_noise = [pcr.baseline_rms_noise for pcr in pcrs if pcr.qc_pass]
+        pcr_noise = [pcr.baseline_noise_stdev for pcr in pcrs if pcr.qc_pass]
         if len(pcr_noise) > 1:
             return np.mean(pcr_noise)
         else:
@@ -940,7 +940,7 @@ class CorrectionMetricFunctions:
     @staticmethod
     def detection_power(pair):
         n_spikes = CorrectionMetricFunctions.n_test_spikes(pair)
-        baseline_noise = CorrectionMetricFunctions.baseline_rms_noise(pair)
+        baseline_noise = CorrectionMetricFunctions.baseline_noise_stdev(pair)
         if n_spikes != np.nan and baseline_noise != np.nan:
             dp = np.log10(np.sqrt(n_spikes) / baseline_noise)
             if np.isfinite(dp):
