@@ -1141,7 +1141,7 @@ class MouseConnectivityModel:
             
             self.connectivity_model = ei_connectivity_model
             
-    def model_adjust_cp(self, pair_groups):
+    def model_adjust_cp(self, pair_groups, model='full_model'):
         # apply self.connectivity_model on pair_groups not necessarily those that the model was built on.
         # For example we apply the E/I model on subclass pair groups across the mouse matrix
         matrix_connectivity = OrderedDict()
@@ -1157,7 +1157,7 @@ class MouseConnectivityModel:
             corr_models = self.connectivity_model[(pre_class.output_synapse_type, post_class.output_synapse_type)]['corr_models']
             matrix_connectivity[pair_group]['corr_models'] = corr_models
 
-            cp_adjust = adjust_cp(cp_results['probed_pairs'], corr_models['full_model'])
+            cp_adjust = adjust_cp(cp_results['probed_pairs'], corr_models[model])
             matrix_connectivity[pair_group]['connectivity_correction_fit'] = cp_adjust
 
         return matrix_connectivity
