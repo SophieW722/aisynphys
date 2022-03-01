@@ -7,6 +7,7 @@ import scipy.optimize
 from scipy.special import erf
 from .util import optional_import
 from aisynphys.database import default_db as db
+from aisynphys.cell_class import CellClass, classify_cells, classify_pairs
 iminuit = optional_import('iminuit')
 
 
@@ -1033,3 +1034,130 @@ def get_correction_model(probed_pairs, correction_metrics, pmax=0.1):
     corr_model['full_model'] = CorrectionModel(pmax, correction_metrics.keys(), correction_functions, correction_parameters)
     
     return corr_model
+
+class MouseConnectivityModel:
+    # This creates and applies an adjusted connectivity model for mouse coarse matrix data
+    # based on the presynaptic cell axon length, the average pair depth from the slice surface
+    # the signal-to-noise (detection power) and the lateral distance between somas.
+
+    adjustment_metrics = {
+        'pre_axon_length': {'model': BinaryModel, 
+                            'model_opts':{
+                                'init': (0.1, 200e-6, 0.5), 
+                                'bounds': ((0.001, 1), (200e-6, 200e-6), (0.1, 0.9))}}, 
+        'avg_pair_depth': {'model': ErfModel, 
+                           'model_opts': {
+                               'init': (0.1, 30e-6, 30e-6), 
+                               'bounds': ((0.01, 1), (10e-6, 200e-6), (-100e-6, 100e-6))}},
+        'detection_power': {'model': ErfModel, 
+                            'model_opts': {
+                                'init': (0.1, 1.0, 3.0), 
+                                'bounds': ((0.001, 1), (0.1, 5), (2, 5)),
+                                'constraint': (0.6745, 4.6613)}}, 
+        'lateral_distance': {'model': GaussianModel, 
+                             'model_opts':{
+                                'method':'L-BFGS-B', 
+                                'init': (0.1, 100e-6), 
+                                'bounds': ((0.001, 1), (100e-6, 100e-6))}}
+        }
+        
+    def check_pair(self, pair, syn_type):
+        return (
+            # must have been probed for connectivity
+            pair_was_probed(pair, syn_type) and
+            # must have a true/false connection call
+            pair.has_synapse is not None and
+            # intersomatic distance < 500 µm (removes some bad data with very large distances)
+            pair.lateral_distance is not None and 
+            pair.lateral_distance < 500e-6
+        )
+    
+    def filter_pair(self, pair, pairs, thresh=0.5):
+        return(
+            pair.pre_axon_length is not None and pair.pre_axon_length >= 
+                np.nanquantile(np.array([p.pre_axon_length for p in pairs], dtype=float), thresh) and
+            pair.avg_pair_depth is not None and pair.avg_pair_depth >= 
+                np.nanquantile(np.array([p.avg_pair_depth for p in pairs], dtype=float), thresh)and
+            pair.detection_power is not None and pair.detection_power >= 
+                np.nanquantile(np.array([p.detection_power for p in pairs], dtype=float), thresh)and
+            pair.lateral_distance is not None and pair.lateral_distance <= 
+                np.nanquantile(np.array([p.lateral_distance for p in pairs], dtype=float), thresh)
+        )      
+
+    def extended_pair_attributes(self, pairs):
+        attributes = list(self.adjustment_metrics.keys())
+        extended_pairs = []
+        for pair in pairs:
+            probe_type = pair.pre_cell.cell_class_nonsynaptic
+            if probe_type not in ['ex', 'in']:
+                continue
+            if not self.check_pair(pair, probe_type):
+                continue
+            for attr in attributes:
+                if hasattr(pair, attr):
+                    continue
+                attr_func = getattr(CorrectionMetricFunctions, attr)
+                val = attr_func(pair)
+                setattr(pair, attr, val)
+
+            extended_pairs.append(pair)
+            
+        return extended_pairs
+    
+    def build_ei_model(self, pairs):
+        # builds model based on E/I cell classes and returns model along with adjusted connectivity for these classes
+
+        extended_pairs = self.extended_pair_attributes(pairs)
+        self.pairs = extended_pairs
+        
+        ei_classes = {'ex': CellClass(cell_class_nonsynaptic='ex', name='ex'), 
+                      'in': CellClass(cell_class_nonsynaptic='in', name='in')}
+        ei_cell_groups = classify_cells(ei_classes.values(), pairs=extended_pairs, missing_attr='ignore')
+        ei_pair_groups = classify_pairs(extended_pairs, ei_cell_groups)
+        ei_connectivity_model = OrderedDict()
+
+        for pair_group, pairs in ei_pair_groups.items():
+            pre_class, post_class = pair_group
+
+            cp_results = get_cp_results(pairs)
+            probed = cp_results['probed_pairs']
+            cp_fit_distance = fit_cp(probed, fit_metric='lateral_distance', fit_model=GaussianModel, fit_opts={'method':'L-BFGS-B'})
+
+            fixed_sigma = 125e-6 if pre_class==post_class else 97e-6
+            self.adjustment_metrics['lateral_distance']['bounds'] = ((0.001, 1), (fixed_sigma, fixed_sigma))
+
+            corr_models = get_correction_model(probed, self.adjustment_metrics)
+            cp_adjust = adjust_cp(probed, corr_models['full_model'])
+
+            ei_connectivity_model[pair_group] = {
+                'lat_dist': np.array([p.lateral_distance for p in probed], dtype=float),
+                'lat_dist_fit': cp_fit_distance,
+                'corr_models': corr_models,
+                'adjusted_cp_fit': cp_adjust,
+                'fixed_sigma': fixed_sigma,
+            }
+    
+            ei_connectivity_model[pair_group].update(cp_results)
+            
+            self.connectivity_model = ei_connectivity_model
+            
+    def model_adjust_cp(self, pair_groups, model='full_model'):
+        # apply self.connectivity_model on pair_groups not necessarily those that the model was built on.
+        # For example we apply the E/I model on subclass pair groups across the mouse matrix
+        matrix_connectivity = OrderedDict()
+        for pair_group, pairs in pair_groups.items():
+            
+            pre_class, post_class = pair_group
+            
+            extended_pairs = self.extended_pair_attributes(pairs)
+            
+            cp_results = get_cp_results(extended_pairs)
+            matrix_connectivity[pair_group] = cp_results
+
+            corr_models = self.connectivity_model[(pre_class.output_synapse_type, post_class.output_synapse_type)]['corr_models']
+            matrix_connectivity[pair_group]['corr_models'] = corr_models
+
+            cp_adjust = adjust_cp(cp_results['probed_pairs'], corr_models[model])
+            matrix_connectivity[pair_group]['connectivity_correction_fit'] = cp_adjust
+
+        return matrix_connectivity
