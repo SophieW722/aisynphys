@@ -41,6 +41,8 @@ class SynphysDatabase(Database):
         if db_size not in current:
             raise Exception(f"This version of aisynphys requires database schema version {cls.schema_version}, "
                             "but no released database files were found with this schema version.")
+        if current[db_size] is None:
+            raise Exception(f"There are no published {db_size} database files for the current schema version ({cls.schema_version}).")
         return cls.load_version(current[db_size]['db_file'])
 
     @classmethod
