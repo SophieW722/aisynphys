@@ -6,7 +6,7 @@ from statsmodels.stats.proportion import proportion_confint
 import scipy.optimize
 from scipy.special import erf
 from .util import optional_import
-from aisynphys.database import default_db as db
+from aisynphys.database import default_db
 from aisynphys.cell_class import CellClass, classify_cells, classify_pairs
 iminuit = optional_import('iminuit')
 
@@ -895,8 +895,10 @@ def recip_connectivity_profile(probes_1, probes_2, bin_edges):
 
 
 class CorrectionMetricFunctions:
-    @staticmethod
-    def pre_axon_length(pair):
+    def __init__(self, db=None):
+        self.db = db or default_db
+
+    def pre_axon_length(self, pair):
         cell_morph = pair.pre_cell.morphology
         if cell_morph is None:
             return np.nan
@@ -905,8 +907,8 @@ class CorrectionMetricFunctions:
         elif cell_morph.axon_truncation == 'intact':
             return 200e-6
 
-    @staticmethod
-    def avg_pair_depth(pair):
+  
+    def avg_pair_depth(self, pair):
         if pair.pre_cell.depth is None or pair.post_cell.depth is None:
             return np.nan
         avg_depth = np.mean([pair.pre_cell.depth, pair.post_cell.depth])
@@ -914,23 +916,22 @@ class CorrectionMetricFunctions:
             return np.nan
         return avg_depth
 
-    @staticmethod
-    def n_test_spikes(pair):
+    def n_test_spikes(self, pair):
         syn_type = pair.pre_cell.cell_class_nonsynaptic
         if syn_type not in ['ex', 'in']:
             return np.nan
 
-        p = db.query(db.Pair).filter(db.Pair.id==pair.id).all()[0]
+        p = self.db.query(self.db.Pair).filter(self.db.Pair.id==pair.id).all()[0]
         n_spikes = getattr(p, 'n_%s_test_spikes' % syn_type)
         n_spikes = n_spikes if n_spikes <= 800 else 800
         return n_spikes            
 
-    @staticmethod
-    def baseline_noise_stdev(pair):
+
+    def baseline_noise_stdev(self, pair):
         post_cell = pair.post_cell
-        q = db.query(db.PatchClampRecording)
-        q = q.join(db.Recording).join(db.Electrode).join(db.Cell)
-        q = q.filter(db.Cell.id==post_cell.id).filter(db.PatchClampRecording.clamp_mode=='ic')
+        q = self.db.query(self.db.PatchClampRecording)
+        q = q.join(self.db.Recording).join(self.db.Electrode).join(self.db.Cell)
+        q = q.filter(self.db.Cell.id==post_cell.id).filter(self.db.PatchClampRecording.clamp_mode=='ic')
         pcrs = q.all()
         pcr_noise = [pcr.baseline_noise_stdev for pcr in pcrs if pcr.qc_pass]
         if len(pcr_noise) > 1:
@@ -938,10 +939,9 @@ class CorrectionMetricFunctions:
         else:
             return np.nan
 
-    @staticmethod
-    def detection_power(pair):
-        n_spikes = CorrectionMetricFunctions.n_test_spikes(pair)
-        baseline_noise = CorrectionMetricFunctions.baseline_noise_stdev(pair)
+    def detection_power(self, pair):
+        n_spikes = self.n_test_spikes(pair)
+        baseline_noise = self.baseline_noise_stdev(pair)
         if n_spikes != np.nan and baseline_noise != np.nan:
             dp = np.log10(np.sqrt(n_spikes) / baseline_noise)
             if np.isfinite(dp):
@@ -1060,7 +1060,9 @@ class MouseConnectivityModel:
                                 'init': (0.1, 100e-6), 
                                 'bounds': ((0.001, 1), (100e-6, 100e-6))}}
         }
-        
+    def __init__(self, db=None):
+        self.db = db or default_db
+
     def check_pair(self, pair, syn_type):
         return (
             # must have been probed for connectivity
@@ -1085,6 +1087,7 @@ class MouseConnectivityModel:
         )      
 
     def extended_pair_attributes(self, pairs):
+        cmf = CorrectionMetricFunctions(db=self.db)
         attributes = list(self.adjustment_metrics.keys())
         extended_pairs = []
         for pair in pairs:
@@ -1096,7 +1099,7 @@ class MouseConnectivityModel:
             for attr in attributes:
                 if hasattr(pair, attr):
                     continue
-                attr_func = getattr(CorrectionMetricFunctions, attr)
+                attr_func = getattr(cmf, attr)
                 val = attr_func(pair)
                 setattr(pair, attr, val)
 
