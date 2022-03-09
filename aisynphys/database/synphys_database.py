@@ -1,6 +1,7 @@
 import datetime
 import os.path
 from sqlalchemy.orm import aliased, contains_eager, selectinload
+import pandas as pd
 from collections import OrderedDict
 from .database import Database
 from .schema import schema_version, default_sample_rate
@@ -471,7 +472,7 @@ class SynphysDatabase(Database):
                 if pairs is None:
                     pairs = df
                 else:
-                    pairs = pairs.append(df)
+                    pairs = pd.concat([pairs, df], axis=0, join='outer')
         
         return pairs
 
