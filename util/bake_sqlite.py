@@ -6,9 +6,9 @@ date = datetime.datetime.today().strftime("%Y-%m-%d")
 fmt_dict = {'date': date, 'schema': db.version_name}
 
 db_files = {
-    'small': "db_bakes/synphys_{schema}_{date}_small.sqlite".format(**fmt_dict),
-    'medium': "db_bakes/synphys_{schema}_current_medium.sqlite".format(**fmt_dict),
-    'full': "db_bakes/synphys_{schema}_current_full.sqlite".format(**fmt_dict),
+    'small': "db_bakes/{schema}_{date}_small.sqlite".format(**fmt_dict),
+    'medium': "db_bakes/{schema}_current_medium.sqlite".format(**fmt_dict),
+    'full': "db_bakes/{schema}_current_full.sqlite".format(**fmt_dict),
 }
 
 skip_tables = {}
