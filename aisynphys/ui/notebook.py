@@ -377,7 +377,7 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         pairs_has_metric = pairs_has_metric[pairs_has_metric['pair_class'].isin(pair_classes)]
         pairs_has_metric[metric] *= scale
         groups = pairs_has_metric.groupby('pair_class')
-        y_vals = [groups.get_group(pair_class)[metric].to_list() for pair_class in pair_classes]
+        y_vals = [groups.get_group(pair_class)[metric].to_list() for pair_class in pair_classes if pair_class in groups]
         if isinstance(palette, str):
             colors = sns.color_palette(palette, n_colors=len(pair_classes))
         else:

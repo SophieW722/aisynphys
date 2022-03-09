@@ -126,9 +126,10 @@ def interactive_download(url, file_path, **kwds):
                 if last_size is not None:
                     chunk_size = i - last_size
                     dt = now - last_update
-                    byte_rate = (chunk_size / dt) ** integration_const * byte_rate ** (1.0 - integration_const)
-                    # slower integration as more samples have been collected
-                    integration_const = max(1e-3, 1.0 / n_chunks)
+                    if dt > 0:
+                        byte_rate = (chunk_size / dt) ** integration_const * byte_rate ** (1.0 - integration_const)
+                        # slower integration as more samples have been collected
+                        integration_const = max(1e-3, 1.0 / n_chunks)
                 n_chunks += 1
                 last_update = now
                 last_size = i

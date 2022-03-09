@@ -2,7 +2,7 @@
 import numpy as np
 from neuroanalysis.fitting import fit_psp
 import aisynphys.data.data_notes_db as notes_db
-from aisynphys.database import default_db as db
+from aisynphys.database import default_db
 from aisynphys.data import PulseResponseList
 
 
@@ -139,11 +139,12 @@ def get_pair_avg_fits(pair, session, notes_session=None, ui=None, max_ind_freq=5
     return results
 
 
-def response_query(session, pair, max_ind_freq=50):
+def response_query(session, pair, max_ind_freq=50, db=None):
     """Query pulse responses appropriate for generating nice average PSP/PSC shapes.
     
     - Only select from multipatch probes with induction frequencies <= 50Hz
     """
+    db = db or default_db
     q = session.query(db.PulseResponse, db.PatchClampRecording, db.StimPulse)
     
     q = q.join(db.StimPulse, db.PulseResponse.stim_pulse)
