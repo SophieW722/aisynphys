@@ -37,6 +37,7 @@ class NDArray(TypeDecorator):
     """
     impl = LargeBinary
     hashable = False
+    cache_ok = False
     
     def process_bind_param(self, value, dialect):
         if value is None:
@@ -86,6 +87,7 @@ class FloatType(TypeDecorator):
     """For marshalling float types (including numpy).
     """
     impl = Float
+    cache_ok = False
     
     def process_bind_param(self, value, dialect):
         if value is None:
