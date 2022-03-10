@@ -2,7 +2,7 @@ import logging
 import numpy as np
 import scipy.stats
 import pandas as pd
-from .database import default_db as db
+from .database import default_db
 
 
 def sorted_pulse_responses(pr_recs):
@@ -41,7 +41,8 @@ def sorted_pulse_responses(pr_recs):
     return sorted_recs
 
 
-def pulse_response_query(pair, qc_pass=False, clamp_mode=None, data=False, spike_data=False, session=None):
+def pulse_response_query(pair, qc_pass=False, clamp_mode=None, data=False, spike_data=False, session=None, db=None):
+    db = db or default_db
     if session is None:
         session = db.session()
     q = session.query(db.PulseResponse, db.PulseResponseFit, db.StimPulse, db.Recording, db.PatchClampRecording, db.MultiPatchProbe, db.Synapse)
@@ -327,7 +328,8 @@ def generate_pair_dynamics(pair, db, session, pr_recs=None):
     return dynamics
 
 
-def stim_sorted_pulse_amp(pair):
+def stim_sorted_pulse_amp(pair, db=None):
+    db = db or default_db
     qc_field = pair.synapse.synapse_type + '_qc_pass'
 
     q = db.query(

@@ -16,8 +16,7 @@ from neuroanalysis.baseline import float_mode
 from aisynphys.avg_response_fit import response_query, sort_responses
 from aisynphys.connectivity import connectivity_profile, distance_adjusted_connectivity
 from aisynphys.data import PulseResponseList
-from aisynphys.dynamics import stim_sorted_pulse_amp
-from aisynphys.database import default_db as db
+from aisynphys.dynamics import stim_sorted_pulse_amp 
 
 
 def heatmap(data, row_labels, col_labels, ax=None, ax_labels=None, bg_color=None,
@@ -377,11 +376,11 @@ def pair_class_metric_scatter(metrics, db, pair_classes, pair_query_args, ax, pa
         pairs_has_metric = pairs_has_metric[pairs_has_metric['pair_class'].isin(pair_classes)]
         pairs_has_metric[metric] *= scale
         groups = pairs_has_metric.groupby('pair_class')
-        y_vals = [groups.get_group(pair_class)[metric].to_list() for pair_class in pair_classes if pair_class in groups]
+        y_vals = [groups.get_group(pair_class)[metric].to_list() for pair_class in pair_classes if pair_class in groups.groups.keys()]
         if isinstance(palette, str):
-            colors = sns.color_palette(palette, n_colors=len(pair_classes))
+            colors = sns.color_palette(palette, n_colors=len(y_vals))
         else:
-            colors = palette
+            colors = palette[:len(y_vals)]
         c2 = [[c]*len(y_vals[i]) for i, c in enumerate(colors)]
         if cmap_log:
             x_vals = swarm([[np.log(y) for y in group] for group in y_vals])
@@ -759,8 +758,8 @@ def data_matrix(data_df, cell_classes, metric=None, scale=1, unit=None, cmap=Non
     return data_rgb, data_str
 
 
-def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=False, scatter_args={}, line_args={}):
-    qc_pass_data = stim_sorted_pulse_amp(pair)
+def plot_stim_sorted_pulse_amp(pair, ax, db, ind_f=50, avg_line=False, avg_trace=False, scatter_args={}, line_args={}):
+    qc_pass_data = stim_sorted_pulse_amp(pair, db=db)
 
     # scatter plots of event amplitudes sorted by pulse number 
     mask = qc_pass_data['induction_frequency'] == ind_f
