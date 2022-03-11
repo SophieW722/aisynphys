@@ -22,5 +22,5 @@ Level of Support
 ----------------
 
 This package is released to enable public users to access and analyze the Synaptic Physiology dataset. We welcome requests for support at the 
-(Community Forum)[https://community.brain-map.org/tag/synaptic-physiology], as well as issues or pull requests on this repository. 
+[Community Forum](https://community.brain-map.org/tag/synaptic-physiology), as well as issues or pull requests on this repository. 
 However, please be patient with us as we may not be able to repond promptly.
