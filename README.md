@@ -4,8 +4,11 @@ Allen Institute Synaptic Physiology
 This package provides data access and analysis tools for the Allen Institute Synaptic Physiology datasets.
 
 **Main website:** http://portal.brain-map.org/explore/connectivity/synaptic-physiology
+
 **Quick start tutorial:** https://mybinder.org/v2/gh/AllenInstitute/aisynphys/binder?filepath=doc/tutorial.ipynb
+
 **Documentation:** https://aisynphys.readthedocs.io/en/latest/
+
 **Community Forum:** https://community.brain-map.org/tag/synaptic-physiology (use the `synaptic-physiology` tag when posting about aisynphys or the dataset)
 
 
