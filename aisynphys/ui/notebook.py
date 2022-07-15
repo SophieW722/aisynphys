@@ -772,7 +772,7 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=Fal
     except KeyError:
         print('No fit amps for pair: %s' % pair)
     ax.set_ylim(0, filtered['dec_fit_reconv_amp'].max())
-    ax.set_xlim(0, 13)
+    ax.set_xlim(0, 12)
 
     scatter_opts = {'color': (0.7, 0.7, 0.7, ), 'size': 3}
     scatter_opts.update(scatter_args)
@@ -791,14 +791,14 @@ def plot_stim_sorted_pulse_amp(pair, ax, ind_f=50, avg_line=False, avg_trace=Fal
         ax.plot(range(8,12), pulse_means[8:12], **line_opts)
     # plot avg trace for each pulse number
     if avg_trace:
-        for pulse_number in np.arange(1,13):
+        for pulse_number in np.arange(0,12):
             pulse_ids = filtered[filtered['pulse_number']==pulse_number]['id'].to_list()
             prs = db.query(db.PulseResponse).filter(db.PulseResponse.id.in_(pulse_ids))
             pr_list = PulseResponseList(prs)
             post_trace = pr_list.post_tseries(align='spike', bsub=True, bsub_win=1e-3)
             trace_mean = post_trace.mean()*1e3
             trace_slice = trace_mean.time_slice(-1e-3, 8e-3)
-            ax.plot(trace_slice.time_values*1e2 + (pulse_number-1.4), abs(trace_slice.data),  **line_opts)
+            ax.plot(trace_slice.time_values*1e2 + (pulse_number-0.4), abs(trace_slice.data),  **line_opts)
     ax.spines['right'].set_visible(False)
     ax.spines['top'].set_visible(False)
 
