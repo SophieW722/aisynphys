@@ -30,7 +30,9 @@ rig_name = None
 n_headstages = 8
 rig_data_paths = {}
 known_addrs = {}
-pipeline = {}
+pipeline = {
+    'disable_modules': []
+}
 
 configfile = os.path.join(os.path.dirname(__file__), '..', 'config.yml')
 
