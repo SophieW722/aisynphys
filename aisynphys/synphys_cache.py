@@ -16,7 +16,7 @@ def list_db_versions():
     # DB urls are stored as a base64-encoded pickle on GitHub.
     # This allows us to change download URLs without requiring users to pull new code.
     # The b64 encoding is just intended to prevent bots scraping our URLs
-    b64_urls = urllib.request.urlopen('https://raw.githubusercontent.com/AllenInstitute/aisynphys/download_urls/download_urls').read()
+    b64_urls = urllib.request.urlopen(config.downloads_url).read()
     version_info = pickle.loads(base64.b64decode(b64_urls))
 
     # parse version and size information from file names
