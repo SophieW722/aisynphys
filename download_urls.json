@@ -1,0 +1,27 @@
+{
+    "default_url_path": "https://allen-synphys.s3-us-west-1.amazonaws.com",
+    "databases": [
+        {"file": "synphys_r2.1_small.sqlite", "schema_version": "22"},
+        {"file": "synphys_r2.1_medium.sqlite", "schema_version": "22"},
+        {"file": "synphys_r2.1_full.sqlite", "schema_version": "22"},
+        {"file": "synphys_r2.0_small.sqlite", "schema_version": "22"},
+        {"file": "synphys_r2.0_medium.sqlite", "schema_version": "22"},
+        {"file": "synphys_r2.0_full.sqlite", "schema_version": "22"},
+        {"file": "synphys_r2.0-pre5_small.sqlite", "schema_version": "21"},
+        {"file": "synphys_r2.0-pre5_medium.sqlite", "schema_version": "21"},
+        {"file": "synphys_r2.0-pre4_small.sqlite", "schema_version": "20"},
+        {"file": "synphys_r2.0-pre4_medium.sqlite", "schema_version": "20"},
+        {"file": "synphys_r2.0-pre3_small.sqlite", "schema_version": "19"},
+        {"file": "synphys_r2.0-pre3_medium.sqlite", "schema_version": "19"},
+        {"file": "synphys_r2.0-pre2_small.sqlite", "schema_version": "18"},
+        {"file": "synphys_r2.0-pre2_medium.sqlite", "schema_version": "18"},
+        {"file": "synphys_r2.0-pre1_small.sqlite", "schema_version": "16"},
+        {"file": "synphys_r2.0-pre1_medium.sqlite", "schema_version": "16"},
+        {"file": "synphys_r2.0-pre1_full.sqlite", "schema_version": "16"},
+        {"file": "synphys_r1.0_small.sqlite", "schema_version": "15", "aliases": ["synphys_r1.0_2019-08-29_small.sqlite"]},
+        {"file": "synphys_r1.0_medium.sqlite", "schema_version": "15", "aliases": ["synphys_r1.0_2019-08-29_medium.sqlite"]},
+        {"file": "synphys_r1.0_full.sqlite", "schema_version": "15", "aliases": ["synphys_r1.0_2019-08-29_full.sqlite"]}
+    ],
+    "raw_data": {}
+    
+}
