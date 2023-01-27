@@ -10,6 +10,9 @@ import os, sys, yaml, argparse
 # default cache path in user's home dir
 cache_path = os.path.join(os.path.expanduser('~'), 'ai_synphys_cache')
 
+# default location of file describing downloadable resources
+downloads_url = 'https://raw.githubusercontent.com/AllenInstitute/aisynphys/download_urls/download_urls.json'
+
 # Parameters for the DB connection provided by aisynphys.database.default_db
 # For sqlite files:
 #    synphys_db_host = "sqlite:///"

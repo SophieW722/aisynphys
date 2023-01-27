@@ -13,23 +13,39 @@ def list_db_versions():
     if _db_versions is not None:
         return _db_versions
 
-    # DB urls are stored as a base64-encoded pickle on GitHub.
+    # DB urls are stored as a json file on GitHub.
     # This allows us to change download URLs without requiring users to pull new code.
-    # The b64 encoding is just intended to prevent bots scraping our URLs
-    b64_urls = urllib.request.urlopen('https://raw.githubusercontent.com/AllenInstitute/aisynphys/download_urls/download_urls').read()
-    version_info = pickle.loads(base64.b64decode(b64_urls))
+    version_data = urllib.request.urlopen(config.downloads_url).read()
+    version_info = json.loads(version_data)
 
     # parse version and size information from file names
     _db_versions = []
-    for name,desc in version_info.items():
-        # accepted formats are "synphys_rX.Y_size.sqlite" or "synphys_rX.Y-preZ_size.sqlite"
-        #   .. although we do handle one older filename
-        m = re.match('synphys_r(\d+\.\d+(-pre\d+)?)(_2019-08-29)?_(small|medium|full).sqlite', name)
-        assert m is not None, "unsupported DB file name: " + name
-        desc['db_file'] = name
-        desc['release_version'] = m.groups()[0]
-        desc['db_size'] = m.groups()[3]
-        _db_versions.append(desc)
+    for version in version_info['databases']:
+        aliases = [version['file']] + version.get('aliases', [])
+        for name in aliases:
+            # extract db size and release version from file name
+            # accepted formats are "synphys_rX.Y_size.sqlite" or "synphys_rX.Y-preZ_size.sqlite"
+            #   .. although we do handle one older filename
+            m = re.match('synphys_r(\d+\.\d+(-pre\d+)?)(_2019-08-29)?_(small|medium|full).sqlite', name)
+            assert m is not None, "unsupported DB file name: " + name
+            
+            # generate download url for this DB. default is {default_url_path}/{file}, but 
+            # this can be overridden in the json
+            url_fmtstr = version.get('url', "{default_url_path}/{file}")
+            url = url_fmtstr.format(
+                default_url_path=version_info['default_url_path'], 
+                file=version['file'],
+            )
+            
+            # generate final description for this DB
+            desc = {
+                'db_file': name,
+                'url': url,
+                'schema_version': version['schema_version'],
+                'release_version': m.groups()[0],
+                'db_size': m.groups()[3],
+            }
+            _db_versions.append(desc)
 
     def version_value(desc):
         m = re.match(r'(\d+)\.(\d+)(-pre(\d+))?', desc['release_version'])
