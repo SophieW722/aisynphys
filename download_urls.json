@@ -1,5 +1,5 @@
 {
-    "default_url_path": "https://allen-synphys.s3-us-west-1.amazonaws.com",
+    "default_url_path": "https://allen-synphys.s3-us-west-2.amazonaws.com",
     "databases": [
         {"file": "synphys_r2.1_small.sqlite", "schema_version": "22"},
         {"file": "synphys_r2.1_medium.sqlite", "schema_version": "22"},
