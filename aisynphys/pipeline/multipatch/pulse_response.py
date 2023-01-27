@@ -30,6 +30,8 @@ class PulseResponsePipelineModule(MultipatchPipelineModule):
 
         prs = [rec.PulseResponse for rec in rq.all()]
         print("%s: got %d pulse responses" % (expt_id, len(prs)))
+        pairs = list(set([pr.pair for pr in prs]))
+        # print(f'Pulses responses selected from pairs: {pairs}')
         
         # best estimate of response amplitude using known latency for this synapse
         fits = 0
@@ -135,7 +137,7 @@ def pulse_response_query(expt_id, db, session):
         .join(db.SyncRec, db.Recording.sync_rec)
         .join(db.Experiment, db.SyncRec.experiment)
         .join(db.Pair, db.PulseResponse.pair)
-        .join(db.Synapse, db.Pair.synapse)
+        .outerjoin(db.Synapse, db.Pair.synapse)
     )
 
     rq = rq.filter(db.Experiment.ext_id==expt_id)

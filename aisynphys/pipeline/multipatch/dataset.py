@@ -137,7 +137,7 @@ class DatasetPipelineModule(MultipatchPipelineModule):
                 all_pulse_entries[rec.device_id] = pulse_entries
 
                 for i,pulse in enumerate(pulses):
-                    # Record information about all pulses, including test pulse.
+                    # Record information about all stim pulses, excluding test pulse.
                     t0, t1 = pulse.meta['pulse_edges']
                     resampled = pulse['primary'].resample(sample_rate=db.default_sample_rate)
                     clock_time = t0 + datetime_to_timestamp(rec_entry.start_time)
