@@ -22,4 +22,4 @@ Conductance = make_table(
 )
 
 Conductance.synapse = relationship(Synapse, back_populates="conductance", cascade="delete", single_parent=True, uselist=False)
-Synapse.conductance = relationship(Conductance, back_populates="synapse", single_parent=True)
+Synapse.conductance = relationship(Conductance, back_populates="synapse", single_parent=True, uselist=False)
