@@ -2,10 +2,10 @@ channels:
   - conda-forge
   - defaults
 dependencies:
-  - python=3.7.5
-  - pyqt=5.12
+  - python=3.8
+  - pyqt>=5.12
   - pip
-  - h5py=2.9.0
+  - h5py>=2.10.0
   - pillow
   - psycopg2
   - sqlalchemy=1.3.11
@@ -21,5 +21,5 @@ dependencies:
   - statsmodels
   - pip:
     - lmfit
-    - git+https://github.com/pyqtgraph/pyqtgraph
+    - pyqtgraph
     - git+https://github.com/alleninstitute/neuroanalysis
