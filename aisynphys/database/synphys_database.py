@@ -272,7 +272,7 @@ class SynphysDatabase(Database):
             individually queried later on. Options are:
             - "experiment" (includes experiment and slice)
             - "cell" (includes cell, morphology, cortical_location, and patch_seq)
-            - "synapse" (includes synapse, resting_state, dynamics, and synapse_model)
+            - "synapse" (includes synapse, resting_state, dynamics, conductance, and synapse_model)
             - "synapse_prediction" (includes only synapse_prediction)
         filter_exprs : list | None
             List of sqlalchemy expressions, each of which will restrict the query
@@ -383,6 +383,10 @@ class SynphysDatabase(Database):
         if filter_exprs is not None:
             for expr in filter_exprs:
                 query = query.filter(expr)
+        
+        preload_allowed = ['experiment', 'cell', 'synapse', 'synapse_prediction']
+        if any([x not in preload_allowed for x in preload]):
+            raise ValueError(f"Preload allowed values are: {preload_allowed}")
 
         if 'experiment' in preload:
             query = (
@@ -428,12 +432,14 @@ class SynphysDatabase(Database):
                 .add_entity(self.Synapse)
                 .add_entity(self.RestingStateFit)
                 .add_entity(self.Dynamics)
+                .add_entity(self.Conductance)
                 .add_entity(self.SynapseModel)
             )
             query = query.options(
                 contains_eager(self.Pair.synapse),
                 contains_eager(self.Synapse.resting_state_fit),
                 contains_eager(self.Pair.dynamics),
+                contains_eager(self.Synapse.conductance),
                 contains_eager(self.Pair.synapse_model),
             )
 
