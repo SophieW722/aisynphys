@@ -1,3 +1,4 @@
+import functools
 import numpy as np
 import uncertainties
 from scipy.optimize import curve_fit
@@ -37,7 +38,9 @@ class ConductancePipelineModule(MultipatchPipelineModule):
 
             # calculate conductance and reversal potential
             try:
-                conductance, reversal, r2 = calculate_conductance(pr_amps, adj_baseline, pair.synapse.synapse_type)
+                syn_type = pair.synapse.synapse_type
+                fixed_reversal = None if syn_type == 'in' else 10e-3
+                conductance, reversal, r2 = calculate_conductance(pr_amps, adj_baseline, syn_type, fixed_reversal=fixed_reversal)
             except RuntimeError:
                 errors.append(f"pair {pair}: linear regression failed")
                 print(f"pair {pair}: linear regression failed -----------------------------------------")
@@ -135,20 +138,40 @@ def ipsc_amp_fn(holding, conductance, reversal):
     return conductance * (holding - reversal)
 
 
-def calculate_conductance(amps, adj_holding, syn_type):
+def calculate_conductance(amps, adj_holding, syn_type, fixed_reversal=None):
     """Given IPSC amplitudes and holding potentials, return an estimated
     conductance, reversal potential, and r^2 value for the linear regression.
 
-    Conductance and reversal each have attributes `.n` for the nominal value
-    and `.s` for the standard deviation.
+    Returns
+    -------
+        conductance : uncertainties.ufloat
+            Conductance value (.n for nominal value, .s for stdev)
+        reversal : uncertainties.ufloat
+            Reversal potential  (.n for nominal value, .s for stdev)
+        r2 : float
+            Fit R^2
     """
     p0 = {
         'in': (10e-9, -70e-3),
-        'ex': (1e-9, 20e-3),
+        'ex': (1e-9, 10e-3),
     }[syn_type]
-    popt, pcov = curve_fit(ipsc_amp_fn, adj_holding, amps, p0=p0)
 
-    r2 = 1 - (sum((amps - ipsc_amp_fn(adj_holding, *popt))**2) / ((len(amps) - 1) * np.var(amps, ddof=1)))
+    if fixed_reversal is None:
+        # fit both conductance and reversal
+        curve_fit_fn = ipsc_amp_fn
+    else:
+        # fit conductance with reversal fixed
+        p0 = p0[:1]
+        curve_fit_fn = functools.partial(ipsc_amp_fn, reversal=fixed_reversal)
 
-    conductance, reversal = uncertainties.correlated_values(popt, pcov)
-    return conductance, reversal, r2
+    popt, pcov = curve_fit(curve_fit_fn, adj_holding, amps, p0=p0)
+
+    r2 = 1 - (sum((amps - curve_fit_fn(adj_holding, *popt))**2) / ((len(amps) - 1) * np.var(amps, ddof=1)))
+
+    corval = uncertainties.correlated_values(popt, pcov)
+    if fixed_reversal is None:
+        conductance, reversal = corval
+        return conductance, reversal, r2
+    else:
+        conductance = corval[0]
+        return conductance, uncertainties.ufloat(float(fixed_reversal), 0.0), r2
