@@ -39,7 +39,8 @@ class ConductancePipelineModule(MultipatchPipelineModule):
             # calculate conductance and reversal potential
             try:
                 syn_type = pair.synapse.synapse_type
-                fixed_reversal = None if syn_type == 'in' else 10e-3
+                # For excitatory synapses, fix the reversal potential at 0 mV (expected AMPA/NMDA reversal) + 14 mV liquid junction potential
+                fixed_reversal = None if syn_type == 'in' else 14e-3
                 conductance, reversal, r2 = calculate_conductance(pr_amps, adj_baseline, syn_type, fixed_reversal=fixed_reversal)
             except RuntimeError:
                 errors.append(f"pair {pair}: linear regression failed")
@@ -153,7 +154,7 @@ def calculate_conductance(amps, adj_holding, syn_type, fixed_reversal=None):
     """
     p0 = {
         'in': (10e-9, -70e-3),
-        'ex': (1e-9, 10e-3),
+        'ex': (1e-9, 14e-3),
     }[syn_type]
 
     if fixed_reversal is None:
